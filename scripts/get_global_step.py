@@ -12,4 +12,4 @@ with tf.Session() as session:
         graph_def.ParseFromString(f.read())
     tf.import_graph_def(graph_def, name="")
     global_step = session.run("global_step:0")
-    print global_step
+    print(global_step)

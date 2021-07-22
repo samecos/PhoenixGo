@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+message ModelConfig {
+    string train_dir = 1;
+    int32 kmp_blocktime = 2;
+    bool kmp_settings = 3;
+    string kmp_affinity = 4;
+    bool enable_tensorrt = 5;
+    string tensorrt_model_path = 6;
+}
