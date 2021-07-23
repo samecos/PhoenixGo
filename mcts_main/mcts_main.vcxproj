@@ -71,6 +71,9 @@
     <ClInclude Include="..\src\wait_group.h" />
     <ClInclude Include="..\src\zero_model_base.h" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="..\README.md" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{ABF9E6C0-D295-4B39-B367-3B67DF2CA3E9}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>

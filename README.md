@@ -183,11 +183,8 @@ to avoid syntax errors in config file and command line options on Windows.
 
 The GPU version is much faster, but works only with compatible nvidia GPU.
 It supports this environment : 
-- CUDA 9.0 only
-- cudnn 7.1.x (x is any number) or lower for CUDA 9.0
-- no AVX, AVX2, AVX512 instructions supported in this release (so it is 
-currently much slower than the linux version)
-- there is no TensorRT support on Windows
+- above CUDA 10.0
+- now TensorRT support on Windows (version >= 7.0)
 
 Download and extract 
 [GPU version (Windows)](https://github.com/Tencent/PhoenixGo/releases/download/win-x64-gpu-v1/PhoenixGo-win-x64-gpu-v1.zip)
