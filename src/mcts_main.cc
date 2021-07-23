@@ -349,9 +349,8 @@ int main(int argc, char* argv[])
 {
     google::ParseCommandLineFlags(&argc, &argv, true);
     google::InitGoogleLogging(argv[0]);
-#if !defined(_WIN32) && !defined(_WIN64)
     google::InstallFailureSignalHandler();
-#endif
+
 
     if (FLAGS_gtp) {
         if (FLAGS_listen_port == 0) {
