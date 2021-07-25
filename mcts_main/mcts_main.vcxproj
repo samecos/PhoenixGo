@@ -22,6 +22,7 @@
     <ClCompile Include="..\src\address_sorting\address_sorting.c" />
     <ClCompile Include="..\src\address_sorting\address_sorting_posix.c" />
     <ClCompile Include="..\src\address_sorting\address_sorting_windows.c" />
+    <ClCompile Include="..\src\analyze.cpp" />
     <ClCompile Include="..\src\async_dist_zero_model_client.cc" />
     <ClCompile Include="..\src\byo_yomi_timer.cc" />
     <ClCompile Include="..\src\dist_config.pb.cc" />
@@ -46,6 +47,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\address_sorting\address_sorting_internal.h" />
+    <ClInclude Include="..\src\analyze.h" />
     <ClInclude Include="..\src\async_dist_zero_model_client.h" />
     <ClInclude Include="..\src\async_rpc_queue.h" />
     <ClInclude Include="..\src\byo_yomi_timer.h" />

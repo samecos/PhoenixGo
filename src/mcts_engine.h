@@ -18,6 +18,7 @@
 #include "mcts_debugger.h"
 #include "byo_yomi_timer.h"
 
+
 struct TreeNode
 {
     std::atomic<TreeNode*> fa;
@@ -64,7 +65,7 @@ class MCTSEngine
     MCTSDebugger &GetDebugger();
     int GetModelGlobalStep();
     ByoYomiTimer &GetByoYomiTimer();
-
+    
  private:
     TreeNode *InitNode(TreeNode *node, TreeNode *fa, int move, float prior_prob);
     TreeNode *FindChild(TreeNode *node, int move);
@@ -115,7 +116,9 @@ class MCTSEngine
     bool EvalCacheFind(uint64_t hash, std::vector<float> &policy, float &value);
 
     bool IsPassDisable();
-
+    void OutputAnalysis(TreeNode* parent);
+    void MCTSEngine::analyze();
+    
  private:
     MCTSConfig m_config;
     std::unique_ptr<MCTSConfig> m_pending_config;
@@ -132,8 +135,9 @@ class MCTSEngine
     std::vector<std::thread> m_search_threads;
     ThreadConductor m_search_threads_conductor;
     bool m_is_searching;
-
+    bool m_is_quit;
     std::thread m_delete_thread;
+    std::thread m_analyze_thread;
     TaskQueue<TreeNode*> m_delete_queue;
 
     std::atomic<int> m_simulation_counter;
@@ -151,4 +155,5 @@ class MCTSEngine
 
     friend class MCTSMonitor;
     friend class MCTSDebugger;
+
 };

@@ -11,8 +11,6 @@
 DEFINE_string(config_path, "", "Path of mcts config file.");
 DEFINE_string(init_moves, "", "Initialize Go board with init_moves.");
 DEFINE_int32(gpu, 0, "gpu used by neural network.");
-DEFINE_int32(intra_op_parallelism_threads, 0, "Number of tf's intra op threads");
-DEFINE_int32(inter_op_parallelism_threads, 0, "Number of tf's inter op threads");
 DEFINE_int32(transform, 0, "Transform features.");
 DEFINE_int32(num_iterations, 1, "How many iterations should run.");
 DEFINE_int32(batch_size, 1, "Batch size of each iterations.");

@@ -84,6 +84,9 @@ extern std::string IdToStr(const GoCoordId id);
 
 extern GoCoordId StrToId(const std::string &str);
 
+extern std::string CoordToMoveStr(const GoCoordId x, const GoCoordId y);
+
+extern std::string IdToMoveStr(const GoCoordId id);
 
 extern void CreateGlobalVariables();
 

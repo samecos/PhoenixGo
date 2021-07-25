@@ -14,6 +14,7 @@
 
 static thread_local std::random_device g_random_device;
 static thread_local std::minstd_rand g_random_engine(g_random_device());
+DECLARE_bool(lizzie);
 
 MCTSEngine::MCTSEngine(const MCTSConfig &config)
     : m_config(config),
@@ -26,7 +27,8 @@ MCTSEngine::MCTSEngine(const MCTSConfig &config)
       m_num_moves(0),
       m_gen_passes(0),
       m_monitor(this),
-      m_debugger(this)
+      m_debugger(this),
+      m_is_quit(false)
 {
 
     std::vector<int> gpu_list;
@@ -56,7 +58,11 @@ MCTSEngine::MCTSEngine(const MCTSConfig &config)
 
     // setup delete thread & tree root
     m_delete_thread = std::thread(&MCTSEngine::DeleteRoutine, this);
+
+    m_analyze_thread = std::thread(&MCTSEngine::analyze, this);
     ChangeRoot(nullptr);
+
+
 
     // wait
     LOG(INFO) << "MCTSEngine: waiting all eval threads init";
@@ -76,6 +82,10 @@ MCTSEngine::~MCTSEngine()
     for (auto &th: m_search_threads) {
         th.join();
     }
+    
+    LOG(INFO) << "~MCTSEngine: Waiting search apply threads terminate";
+    m_is_quit = true;
+   
     LOG(INFO) << "~MCTSEngine: Waiting eval threads terminate";
     m_eval_task_queue.Close();
     for (auto &th: m_eval_threads) {
@@ -85,6 +95,7 @@ MCTSEngine::~MCTSEngine()
     m_delete_queue.Push(m_root);
     m_delete_queue.Close();
     m_delete_thread.join();
+    
     LOG(INFO) << "~MCTSEngine: Deconstruct MCTSEngin succ";
 }
 
@@ -241,6 +252,7 @@ ByoYomiTimer &MCTSEngine::GetByoYomiTimer()
 {
     return m_byo_yomi_timer;
 }
+
 
 TreeNode *MCTSEngine::InitNode(TreeNode *node, TreeNode *fa, int move, float prior_prob)
 {
@@ -1021,6 +1033,23 @@ std::vector<int> MCTSEngine::GetVisitCount(TreeNode *node)
         }
     }
     return visit_count;
+}
+
+void MCTSEngine::analyze()
+{
+    time_t elapsed, start = clock();
+    float elapsed_time;
+    int count = 0;
+    for (;;) {
+        elapsed = clock();
+        elapsed_time = float(elapsed - start);
+        if (elapsed_time > 20 && FLAGS_lizzie) { // 5 outputs per second
+            start = elapsed;
+            MCTSEngine::OutputAnalysis(MCTSEngine::m_debugger.GetEngine()->m_root);
+        }
+        if (m_is_quit)
+            break;
+    }
 }
 
 template<class T>
