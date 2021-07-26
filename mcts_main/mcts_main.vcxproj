@@ -22,7 +22,7 @@
     <ClCompile Include="..\src\address_sorting\address_sorting.c" />
     <ClCompile Include="..\src\address_sorting\address_sorting_posix.c" />
     <ClCompile Include="..\src\address_sorting\address_sorting_windows.c" />
-    <ClCompile Include="..\src\analyze.cpp" />
+    <ClCompile Include="..\src\analyze.cc" />
     <ClCompile Include="..\src\async_dist_zero_model_client.cc" />
     <ClCompile Include="..\src\byo_yomi_timer.cc" />
     <ClCompile Include="..\src\dist_config.pb.cc" />
@@ -36,6 +36,7 @@
     <ClCompile Include="..\src\mcts_config.pb.cc" />
     <ClCompile Include="..\src\mcts_debugger.cc" />
     <ClCompile Include="..\src\mcts_engine.cc" />
+    <ClCompile Include="..\src\mcts_eval.cc" />
     <ClCompile Include="..\src\mcts_main.cc" />
     <ClCompile Include="..\src\mcts_monitor.cc" />
     <ClCompile Include="..\src\model_config.pb.cc" />
@@ -63,6 +64,7 @@
     <ClInclude Include="..\src\mcts_config.pb.h" />
     <ClInclude Include="..\src\mcts_debugger.h" />
     <ClInclude Include="..\src\mcts_engine.h" />
+    <ClInclude Include="..\src\mcts_eval.h" />
     <ClInclude Include="..\src\mcts_monitor.h" />
     <ClInclude Include="..\src\model_config.pb.h" />
     <ClInclude Include="..\src\str_utils.h" />
