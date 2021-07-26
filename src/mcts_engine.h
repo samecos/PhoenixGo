@@ -17,7 +17,7 @@
 #include "mcts_monitor.h"
 #include "mcts_debugger.h"
 #include "byo_yomi_timer.h"
-
+#include "config.h"
 
 struct TreeNode
 {
@@ -40,13 +40,13 @@ const int k_unexpanded = 0;
 const int k_expanding = 1;
 const int k_expanded = 2;
 
-typedef std::function<void(int, std::vector<float>, float)> EvalCallback;
+//typedef std::function<void(int, std::vector<float>, float)> EvalCallback;
 
-struct EvalTask
-{
-    std::vector<bool> features;
-    EvalCallback callback;
-};
+//struct EvalTask
+//{
+//    std::vector<bool> features;
+//    EvalCallback callback;
+//};
 
 class MCTSEngine
 {
@@ -65,6 +65,10 @@ class MCTSEngine
     MCTSDebugger &GetDebugger();
     int GetModelGlobalStep();
     ByoYomiTimer &GetByoYomiTimer();
+    TreeNode* GetRoot()
+    {
+        return m_root;
+    }
     
  private:
     TreeNode *InitNode(TreeNode *node, TreeNode *fa, int move, float prior_prob);
@@ -116,8 +120,9 @@ class MCTSEngine
     bool EvalCacheFind(uint64_t hash, std::vector<float> &policy, float &value);
 
     bool IsPassDisable();
-    void OutputAnalysis(TreeNode* parent);
-    void MCTSEngine::analyze();
+    void MCTSEngine::OutputAnalysis();
+    void MCTSEngine::analyzes();
+    
     
  private:
     MCTSConfig m_config;
@@ -127,7 +132,7 @@ class MCTSEngine
     GoState m_board;
 
     std::vector<std::thread> m_eval_threads;
-    TaskQueue<EvalTask> m_eval_task_queue;
+    //TaskQueue<EvalTask> m_eval_task_queue;
     WaitGroup m_eval_threads_init_wg;
     WaitGroup m_eval_tasks_wg;
     std::atomic<int> m_model_global_step;
@@ -135,7 +140,7 @@ class MCTSEngine
     std::vector<std::thread> m_search_threads;
     ThreadConductor m_search_threads_conductor;
     bool m_is_searching;
-    bool m_is_quit;
+
     std::thread m_delete_thread;
     std::thread m_analyze_thread;
     TaskQueue<TreeNode*> m_delete_queue;

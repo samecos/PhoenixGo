@@ -11,7 +11,7 @@
 #include "trt_zero_model.h"
 #include "dist_zero_model_client.h"
 #include "async_dist_zero_model_client.h"
-
+#include "analyze.h"
 static thread_local std::random_device g_random_device;
 static thread_local std::minstd_rand g_random_engine(g_random_device());
 DECLARE_bool(lizzie);
@@ -20,17 +20,15 @@ MCTSEngine::MCTSEngine(const MCTSConfig &config)
     : m_config(config),
       m_root(nullptr),
       m_board(!config.disable_positional_superko()),
-      m_eval_task_queue(config.eval_task_queue_size()),
       m_model_global_step(0),
       m_is_searching(false),
       m_simulation_counter(0),
       m_num_moves(0),
       m_gen_passes(0),
       m_monitor(this),
-      m_debugger(this),
-      m_is_quit(false)
+      m_debugger(this)
 {
-
+    
     std::vector<int> gpu_list;
     for (const std::string &gpu: SplitStr(m_config.gpu_list(), ',')) {
         gpu_list.push_back(gpu.empty() ? 0 : std::stoi(gpu));
@@ -58,11 +56,13 @@ MCTSEngine::MCTSEngine(const MCTSConfig &config)
 
     // setup delete thread & tree root
     m_delete_thread = std::thread(&MCTSEngine::DeleteRoutine, this);
+    if (FLAGS_lizzie)
+    {
+        m_analyze_thread = std::thread(&MCTSEngine::analyzes, this);
+        FLAGS_lizzie = false;
+    }
 
-    m_analyze_thread = std::thread(&MCTSEngine::analyze, this);
     ChangeRoot(nullptr);
-
-
 
     // wait
     LOG(INFO) << "MCTSEngine: waiting all eval threads init";
@@ -76,6 +76,7 @@ MCTSEngine::MCTSEngine(const MCTSConfig &config)
 
 MCTSEngine::~MCTSEngine()
 {
+    m_is_quit = true;
     LOG(INFO) << "~MCTSEngine: Deconstructing MCTSEngine";
     m_search_threads_conductor.Terminate();
     LOG(INFO) << "~MCTSEngine: Waiting search threads terminate";
@@ -84,8 +85,7 @@ MCTSEngine::~MCTSEngine()
     }
     
     LOG(INFO) << "~MCTSEngine: Waiting search apply threads terminate";
-    m_is_quit = true;
-   
+
     LOG(INFO) << "~MCTSEngine: Waiting eval threads terminate";
     m_eval_task_queue.Close();
     for (auto &th: m_eval_threads) {
@@ -1035,22 +1035,7 @@ std::vector<int> MCTSEngine::GetVisitCount(TreeNode *node)
     return visit_count;
 }
 
-void MCTSEngine::analyze()
-{
-    time_t elapsed, start = clock();
-    float elapsed_time;
-    int count = 0;
-    for (;;) {
-        elapsed = clock();
-        elapsed_time = float(elapsed - start);
-        if (elapsed_time > 20 && FLAGS_lizzie) { // 5 outputs per second
-            start = elapsed;
-            MCTSEngine::OutputAnalysis(MCTSEngine::m_debugger.GetEngine()->m_root);
-        }
-        if (m_is_quit)
-            break;
-    }
-}
+
 
 template<class T>
 void MCTSEngine::TransformFeatures(T &features, int mode, bool reverse)
@@ -1102,4 +1087,59 @@ bool MCTSEngine::IsPassDisable()
 {
     return m_config.disable_pass() ||
            (m_config.max_gen_passes() && m_gen_passes >= m_config.max_gen_passes());
+}
+
+void MCTSEngine::OutputAnalysis() {
+    // We need to make a copy of the data before sorting
+    auto sortable_data = std::vector<OutputAnalysisData>();
+
+    if (m_debugger.GetEngine()->GetRoot()->ch_len == 0) { // nothing to print
+        return;
+    }
+
+    for (int i = 0; i < m_debugger.GetEngine()->GetRoot()->ch_len; ++i) {
+        TreeNode* node = m_debugger.GetEngine()->GetRoot()->ch;
+
+        std::string move = GoFunction::IdToMoveStr(node[i].move);
+
+        // TODO: use a better way to get pv
+        std::string pv = move + " " + m_debugger.GetMainMovePaths(i);
+
+        // Not sure the meaning of value
+        float root_action = (float)node[i].total_action / k_action_value_base / node[i].visit_count;
+        float move_eval = (root_action + 1) * 50 * 100;
+        float policy = node[i].prior_prob * 100;
+        sortable_data.emplace_back(move, node[i].visit_count, move_eval, policy, pv);
+    }
+    std::stable_sort(std::begin(sortable_data), std::end(sortable_data));
+
+    // Output analysis data in gtp stream
+    auto i = 0;
+    for (const auto& node : sortable_data) {
+        if (i > 0) {
+            std::cerr << " ";
+        }
+        std::cerr << node.get_info_string(i);
+        i++;
+    }
+    std::cerr << "\n";
+}
+
+
+
+void MCTSEngine::analyzes()
+{
+    time_t elapsed, start = clock();
+    float elapsed_time;
+    int count = 0;
+    for (;;) {
+        elapsed = clock();
+        elapsed_time = float(elapsed - start);
+        if (elapsed_time > 200 && FLAGS_lizzie) { // 5 outputs per second
+            start = elapsed;
+            MCTSEngine::OutputAnalysis();
+        }
+        if (m_is_quit)
+            break;
+    }
 }

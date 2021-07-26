@@ -2,7 +2,7 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #endif
-
+#pragma once
 #include <boost/asio.hpp>
 #include <glog/logging.h>
 #include <gflags/gflags.h>
@@ -11,6 +11,8 @@
 #include "str_utils.h"
 
 #include "mcts_engine.h"
+#include "analyze.h"
+
 
 namespace asio = boost::asio;
 
@@ -47,6 +49,8 @@ std::unique_ptr<MCTSEngine> InitEngine(const std::string &config_path)
     auto config = InitConfig(config_path);
     CHECK(config != nullptr) << "Load mcts config file '" << config_path << "' failed";
     LOG(INFO) << "load config succ: \n" << config->DebugString();
+    
+    
     return std::unique_ptr<MCTSEngine>(new MCTSEngine(*config));
 }
 
@@ -264,7 +268,7 @@ void GTPServing(std::istream &in, std::ostream &out)
         engine->Reset(FLAGS_init_moves);
     }
     std::cerr << std::flush;
-
+    m_eval_task_queue.Set(engine->GetConfig().eval_task_queue_size());
     int id;
     bool has_id, succ;
     std::string cmd, output;
@@ -296,6 +300,7 @@ void GTPServing(std::istream &in, std::ostream &out)
             break;
         }
     }
+    m_is_quit = true;
     LOG(WARNING) << "exiting gtp serving";
 }
 
@@ -372,9 +377,8 @@ int main(int argc, char* argv[])
     google::ParseCommandLineFlags(&argc, &argv, true);
     google::InitGoogleLogging(argv[0]);
     google::InstallFailureSignalHandler();
-    FLAGS_lizzie = false;
 
-    if (FLAGS_gtp) {
+     if (FLAGS_gtp) {
         if (FLAGS_listen_port == 0) {
             GTPServing(std::cin, std::cout);
         } else {

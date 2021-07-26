@@ -1,37 +1,27 @@
 #include "analyze.h"
 
-void MCTSEngine::OutputAnalysis(TreeNode* parent) {
-    // We need to make a copy of the data before sorting
-    auto sortable_data = std::vector<OutputAnalysisData>();
 
-    if (parent->ch_len == 0) { // nothing to print
-        return;
+OutputAnalysisData::OutputAnalysisData(std::string move, const int visits, const float winrate,
+    const float policy_prior, std::string pv)
+    : m_move(std::move(move)),
+    m_visits(visits),
+    m_winrate(winrate),
+    m_policy_prior(policy_prior),
+    m_pv(std::move(pv)) {}
+
+std::string OutputAnalysisData::get_info_string(const int order) const {
+    auto tmp = "info move " + m_move
+        + " visits " + std::to_string(m_visits)
+        + " winrate "
+        + std::to_string(static_cast<int>(m_winrate))
+        + " prior "
+        + std::to_string(static_cast<int>(m_policy_prior))
+        + " lcb "
+        + "0";
+    if (order >= 0) {
+        tmp += " order " + std::to_string(order);
     }
-
-    for (int i = 0; i < parent->ch_len; ++i) {
-        TreeNode* node = parent->ch;
-
-        std::string move = GoFunction::IdToMoveStr(node[i].move);
-
-        // TODO: use a better way to get pv
-        std::string pv = move + " " + m_debugger.GetMainMovePaths(i);
-
-        // Not sure the meaning of value
-        float root_action = (float)node[i].total_action / k_action_value_base / node[i].visit_count;
-        float move_eval = (root_action + 1) * 50 * 100;
-        float policy = node[i].prior_prob * 100;
-        sortable_data.emplace_back(move, node[i].visit_count, move_eval, policy, pv);
-    }
-    std::stable_sort(std::begin(sortable_data), std::end(sortable_data));
-
-    // Output analysis data in gtp stream
-    auto i = 0;
-    for (const auto& node : sortable_data) {
-        if (i > 0) {
-            std::cerr << " ";
-        }
-        std::cerr << node.get_info_string(i);
-        i++;
-    }
-    std::cerr << "\n";
+    tmp += " pv " + m_pv;
+    return tmp;
 }
+

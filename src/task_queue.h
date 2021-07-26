@@ -82,6 +82,11 @@ class TaskQueue
         return m_size;
     }
 
+    void Set(int capacity = 0)
+    {
+        m_capacity = capacity;
+    }
+
  private:
     std::deque<T> m_queue;
     int m_capacity;

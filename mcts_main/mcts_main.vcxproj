@@ -25,6 +25,7 @@
     <ClCompile Include="..\src\analyze.cc" />
     <ClCompile Include="..\src\async_dist_zero_model_client.cc" />
     <ClCompile Include="..\src\byo_yomi_timer.cc" />
+    <ClCompile Include="..\src\config.cc" />
     <ClCompile Include="..\src\dist_config.pb.cc" />
     <ClCompile Include="..\src\dist_zero_model.grpc.pb.cc" />
     <ClCompile Include="..\src\dist_zero_model.pb.cc" />
@@ -52,6 +53,7 @@
     <ClInclude Include="..\src\async_dist_zero_model_client.h" />
     <ClInclude Include="..\src\async_rpc_queue.h" />
     <ClInclude Include="..\src\byo_yomi_timer.h" />
+    <ClInclude Include="..\src\config.h" />
     <ClInclude Include="..\src\dist_config.pb.h" />
     <ClInclude Include="..\src\dist_zero_model.grpc.pb.h" />
     <ClInclude Include="..\src\dist_zero_model.pb.h" />
@@ -82,6 +84,7 @@
     <ProjectGuid>{ABF9E6C0-D295-4B39-B367-3B67DF2CA3E9}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <ProjectName>mcts_main</ProjectName>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -187,6 +190,7 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
       <OpenMPSupport>true</OpenMPSupport>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link />
     <Link>
