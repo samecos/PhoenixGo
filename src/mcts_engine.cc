@@ -22,7 +22,6 @@ MCTSEngine::MCTSEngine(const MCTSConfig &config)
     : m_config(config),
       m_root(nullptr),
       m_board(!config.disable_positional_superko()),
-      m_model_global_step(0),
       m_is_searching(false),
       m_simulation_counter(0),
       m_num_moves(0),
@@ -81,16 +80,15 @@ MCTSEngine::MCTSEngine(const MCTSConfig &config)
 
 MCTSEngine::~MCTSEngine()
 {
-    g_analyze_thtead_is_quit = true;
+    //g_analyze_thtead_is_quit = true;
     LOG(INFO) << "~MCTSEngine: Deconstructing MCTSEngine";
     m_search_threads_conductor.Terminate();
     LOG(INFO) << "~MCTSEngine: Waiting search threads terminate";
+    LOG(INFO) << "~MCTSEngine: Waiting search apply threads terminate";
     for (auto &th: m_search_threads) {
         th.join();
     }
-    
-    LOG(INFO) << "~MCTSEngine: Waiting search apply threads terminate";
-
+    m_analyze_thread.join();
     LOG(INFO) << "~MCTSEngine: Waiting eval threads terminate";
     g_eval_task_queue.Close();
     for (auto &th: g_eval_with_batch_threads) {
@@ -248,10 +246,10 @@ MCTSDebugger &MCTSEngine::GetDebugger()
     return m_debugger;
 }
 
-int MCTSEngine::GetModelGlobalStep()
-{
-    return m_model_global_step;
-}
+//int MCTSEngine::GetModelGlobalStep()
+//{
+//    return m_model_global_step;
+//}
 
 ByoYomiTimer &MCTSEngine::GetByoYomiTimer()
 {
@@ -1085,13 +1083,16 @@ void MCTSEngine::analyzes()
     float elapsed_time;
     int count = 0;
     for (;;) {
+        if (m_search_threads_conductor.IsTerminate())
+        {
+            LOG(WARNING) << "search apply threads: terminate";
+            return;
+        }
         elapsed = clock();
         elapsed_time = float(elapsed - start);
         if (elapsed_time > 200 && FLAGS_lizzie) { // 5 outputs per second
             start = elapsed;
             MCTSEngine::OutputAnalysis();
         }
-        if (g_analyze_thtead_is_quit)
-            break;
     }
 }

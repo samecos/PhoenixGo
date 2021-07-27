@@ -63,7 +63,7 @@ class MCTSEngine
     MCTSConfig &GetConfig();
     void SetPendingConfig(std::unique_ptr<MCTSConfig> config);
     MCTSDebugger &GetDebugger();
-    int GetModelGlobalStep();
+    //int GetModelGlobalStep();
     ByoYomiTimer &GetByoYomiTimer();
     TreeNode* GetRoot()
     {
@@ -131,7 +131,7 @@ class MCTSEngine
     TreeNode *m_root;
     GoState m_board;
 
-    std::atomic<int> m_model_global_step;
+
 
     std::vector<std::thread> m_search_threads;
     ThreadConductor m_search_threads_conductor;

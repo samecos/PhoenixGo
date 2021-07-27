@@ -16,5 +16,5 @@ public:
 
 private:
 	MCTSMonitor m_monitor;
-	std::atomic<int> m_model_global_step;
+	//std::atomic<int> m_model_global_step;
 };

@@ -286,7 +286,6 @@ void GTPServing(std::istream &in, std::ostream &out)
             break;
         }
     }
-    g_analyze_thtead_is_quit = true;
     LOG(WARNING) << "exiting gtp serving";
 }
 

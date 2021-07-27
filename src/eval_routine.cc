@@ -7,8 +7,7 @@
 #include "dist_zero_model_client.h"
 #include "async_dist_zero_model_client.h"
 Eval_Routine::Eval_Routine(MCTSEngine* engine)
-    : m_monitor(engine),
-      m_model_global_step(0)
+    : m_monitor(engine)
 {}
 
 Eval_Routine::~Eval_Routine()
@@ -19,15 +18,15 @@ void Eval_Routine::EvalRoutine_out(std::unique_ptr<ZeroModelBase> model)
     int ret = model->Init(g_config->model_config());
     CHECK_EQ(ret, 0) << "EvalRoutine: model init failed, ret " << ret;
 
-    int global_step;
-    ret = model->GetGlobalStep(global_step);
-    CHECK_EQ(ret, 0) << "EvalRoutine: model get global_step failed, ret " << ret;
+    //int global_step;
+    //ret = model->GetGlobalStep(global_step);
+    //CHECK_EQ(ret, 0) << "EvalRoutine: model get global_step failed, ret " << ret;
 
-    LOG(INFO) << "EvalRoutine: init model done, global_step=" << global_step;
-    int expect_zero = 0;
-    if (!m_model_global_step.compare_exchange_strong(expect_zero, global_step)) {
-        CHECK_EQ(expect_zero, global_step) << "EvalRoutine: global_step different with other routines";
-    }
+    //LOG(INFO) << "EvalRoutine: init model done, global_step=" << global_step;
+    //int expect_zero = 0;
+    //if (!m_model_global_step.compare_exchange_strong(expect_zero, global_step)) {
+    //    CHECK_EQ(expect_zero, global_step) << "EvalRoutine: global_step different with other routines";
+    //}
 
     g_eval_threads_init_wg.Done();
     for (;;) {

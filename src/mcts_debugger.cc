@@ -30,7 +30,7 @@ void MCTSDebugger::Debug() // call before move
         int depth = m_engine->GetConfig().debugger().print_tree_depth();
         int width = m_engine->GetConfig().debugger().print_tree_width();
         PrintTree(depth ? depth : 1, width ? width : 10);
-        VLOG(1) << "model global step: " << m_engine->m_model_global_step;
+        //VLOG(1) << "model global step: " << m_engine->m_model_global_step;
         VLOG(1) << "========== debug info for " << ith_str << " end   ==========";
     }
 }
@@ -55,7 +55,7 @@ std::string MCTSDebugger::GetDebugStr()
             ", height=" + std::to_string(m_engine->m_monitor.MaxSearchTreeHeight()) +
             ", avg_height=" + std::to_string(m_engine->m_monitor.AvgSearchTreeHeight());
     }
-    debug_str += ", global_step=" + std::to_string(m_engine->m_model_global_step);
+    //debug_str += ", global_step=" + std::to_string(m_engine->m_model_global_step);
     return debug_str;
 }
 
