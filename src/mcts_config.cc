@@ -2,25 +2,42 @@
 
 #include <fstream>
 
+#include <gflags/gflags.h>
 #include <google/protobuf/text_format.h>
 #include <glog/logging.h>
+#include "config.h"
+DECLARE_string(gpu_list);
 
-std::unique_ptr<MCTSConfig> LoadConfig(const char *config_path)
+void LoadConfig(const char *config_path)
 {
-    auto config = std::unique_ptr<MCTSConfig>(new MCTSConfig);
+    g_config.reset(new MCTSConfig);
+    //auto config = std::unique_ptr<MCTSConfig>(new MCTSConfig);
     std::ostringstream conf_ss;
     if (!(conf_ss << std::ifstream(config_path).rdbuf())) {
         PLOG(ERROR) << "read config file " << config_path << " error";
-        return nullptr;
+        return ;
     }
-    if (!google::protobuf::TextFormat::ParseFromString(conf_ss.str(), config.get())) {
+    if (!google::protobuf::TextFormat::ParseFromString(conf_ss.str(), g_config.get())) {
         LOG(ERROR) << "parse config file " << config_path << " error! buf=" << conf_ss.str();
-        return nullptr;
+        return ;
     }
-    return config;
+    //return config;
 }
 
-std::unique_ptr<MCTSConfig> LoadConfig(const std::string &config_path)
+ void LoadConfig(const std::string &config_path)
 {
-    return LoadConfig(config_path.c_str());
+    LoadConfig(config_path.c_str());
 }
+
+void InitConfig(const std::string& config_path)
+{
+    LoadConfig(config_path);
+    if (g_config == nullptr) {
+        return ;
+    }
+
+    if (FLAGS_gpu_list.size()) {
+        g_config->set_gpu_list(FLAGS_gpu_list);
+    }
+}
+

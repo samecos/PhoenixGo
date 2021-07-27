@@ -137,6 +137,7 @@
       <AdditionalIncludeDirectories>$(ProjectDir);$(CUDA_PATH)\include;C:\dev\vcpkg\installed\x64-windows\include;C:\Program Files\TensorRT-7.0.0.11\include;$(ProjectDir)\..\src\address_sorting\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
       <OpenMPSupport>true</OpenMPSupport>
+      <LanguageStandard>stdcpp14</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

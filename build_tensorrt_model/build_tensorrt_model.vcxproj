@@ -135,6 +135,7 @@
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(CUDA_PATH)\include;C:\Program Files\TensorRT-7.0.0.11\include;C:\dev\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <LanguageStandard>stdcpp14</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

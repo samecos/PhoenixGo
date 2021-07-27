@@ -30,41 +30,27 @@ DEFINE_bool(lizzie, false, "output analyze data for Lizzie.");
 const int k_handicaps_x[5] = {3, 15, 15, 3, 9};
 const int k_handicaps_y[5] = {3, 15, 3, 15, 9};
 
-std::unique_ptr<MCTSConfig> InitConfig(const std::string &config_path)
-{
-    auto config = LoadConfig(config_path);
-    if (config == nullptr) {
-        return nullptr;
-    }
-
-    if (FLAGS_gpu_list.size()) {
-        config->set_gpu_list(FLAGS_gpu_list);
-    }
-
-    return config;
-}
-
 std::unique_ptr<MCTSEngine> InitEngine(const std::string &config_path)
 {
-    auto config = InitConfig(config_path);
-    CHECK(config != nullptr) << "Load mcts config file '" << config_path << "' failed";
-    LOG(INFO) << "load config succ: \n" << config->DebugString();
+    InitConfig(config_path);
+    CHECK(g_config != nullptr) << "Load mcts config file '" << config_path << "' failed";
+    LOG(INFO) << "load config succ: \n" << g_config->DebugString();
     
     
-    return std::unique_ptr<MCTSEngine>(new MCTSEngine(*config));
+    return std::unique_ptr<MCTSEngine>(new MCTSEngine(*g_config));
 }
 
 void ReloadConfig(MCTSEngine &engine, const std::string &config_path)
 {
-    auto config = InitConfig(config_path);
-    if (config == nullptr) {
+    InitConfig(config_path);
+    if (g_config == nullptr) {
         LOG(ERROR) << "Load mcts config file '" << config_path << "' failed";
         return;
     }
-    if (google::protobuf::util::MessageDifferencer::Equals(engine.GetConfig(), *config)) {
+    if (google::protobuf::util::MessageDifferencer::Equals(engine.GetConfig(), *g_config)) {
         LOG(INFO) << "Config hasn't changed";
     } else {
-        engine.SetPendingConfig(std::move(config));
+        engine.SetPendingConfig(std::move(g_config));
     }
 }
 
@@ -268,7 +254,7 @@ void GTPServing(std::istream &in, std::ostream &out)
         engine->Reset(FLAGS_init_moves);
     }
     std::cerr << std::flush;
-    m_eval_task_queue.Set(engine->GetConfig().eval_task_queue_size());
+    g_eval_task_queue.Set(engine->GetConfig().eval_task_queue_size());
     int id;
     bool has_id, succ;
     std::string cmd, output;
@@ -300,7 +286,7 @@ void GTPServing(std::istream &in, std::ostream &out)
             break;
         }
     }
-    m_is_quit = true;
+    g_analyze_thtead_is_quit = true;
     LOG(WARNING) << "exiting gtp serving";
 }
 

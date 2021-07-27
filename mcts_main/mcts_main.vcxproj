@@ -30,6 +30,7 @@
     <ClCompile Include="..\src\dist_zero_model.grpc.pb.cc" />
     <ClCompile Include="..\src\dist_zero_model.pb.cc" />
     <ClCompile Include="..\src\dist_zero_model_client.cc" />
+    <ClCompile Include="..\src\eval_routine.cc" />
     <ClCompile Include="..\src\go_comm.cc" />
     <ClCompile Include="..\src\go_state.cc" />
     <ClCompile Include="..\src\leaky_bucket.cc" />
@@ -59,6 +60,7 @@
     <ClInclude Include="..\src\dist_zero_model.pb.h" />
     <ClInclude Include="..\src\dist_zero_model_client.h" />
     <ClInclude Include="..\src\errordef.h" />
+    <ClInclude Include="..\src\eval_routine.h" />
     <ClInclude Include="..\src\go_comm.h" />
     <ClInclude Include="..\src\go_state.h" />
     <ClInclude Include="..\src\leaky_bucket.h" />
@@ -190,7 +192,7 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
       <OpenMPSupport>true</OpenMPSupport>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp14</LanguageStandard>
     </ClCompile>
     <Link />
     <Link>

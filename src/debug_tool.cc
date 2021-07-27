@@ -7,14 +7,14 @@
 #include "timer.h"
 
 #include "mcts_config.h"
-
+#include "config.h"
 DEFINE_string(config_path, "", "Path of mcts config file.");
 DEFINE_string(init_moves, "", "Initialize Go board with init_moves.");
 DEFINE_int32(gpu, 0, "gpu used by neural network.");
 DEFINE_int32(transform, 0, "Transform features.");
 DEFINE_int32(num_iterations, 1, "How many iterations should run.");
 DEFINE_int32(batch_size, 1, "Batch size of each iterations.");
-
+DEFINE_string(gpu_list, "", "List of gpus used by neural network.");
 void InitMove(GoState& board, std::string& moves)
 {
     for (size_t i = 0; i < moves.size(); i += 3) {
@@ -63,12 +63,12 @@ int main(int argc, char* argv[])
     google::InitGoogleLogging(argv[0]);
     google::InstallFailureSignalHandler();
 
-    auto config = LoadConfig(FLAGS_config_path);
-    CHECK(config != nullptr) << "Load mcts config file '" << FLAGS_config_path << "' failed";
+    LoadConfig(FLAGS_config_path);
+    CHECK(g_config != nullptr) << "Load mcts config file '" << FLAGS_config_path << "' failed";
 
     std::unique_ptr<ZeroModelBase> model(new TrtZeroModel(FLAGS_gpu));
 
-    CHECK_EQ(model->Init(config->model_config()), 0) << "Model Init Fail, config path " << FLAGS_config_path<< ", gpu " << FLAGS_gpu;
+    CHECK_EQ(model->Init(g_config->model_config()), 0) << "Model Init Fail, config path " << FLAGS_config_path<< ", gpu " << FLAGS_gpu;
 
     GoState board;
     InitMove(board, FLAGS_init_moves);

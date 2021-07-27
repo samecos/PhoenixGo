@@ -75,7 +75,7 @@ class MCTSEngine
     TreeNode *FindChild(TreeNode *node, int move);
 
     void Eval(const GoState &board, EvalCallback callback);
-    void EvalRoutine(std::unique_ptr<ZeroModelBase> model);
+    //void EvalRoutine(std::unique_ptr<ZeroModelBase> model);
 
     TreeNode *Select(GoState &board);
     TreeNode *SelectChild(TreeNode *node);
@@ -131,10 +131,6 @@ class MCTSEngine
     TreeNode *m_root;
     GoState m_board;
 
-    std::vector<std::thread> m_eval_threads;
-    //TaskQueue<EvalTask> m_eval_task_queue;
-    WaitGroup m_eval_threads_init_wg;
-    WaitGroup m_eval_tasks_wg;
     std::atomic<int> m_model_global_step;
 
     std::vector<std::thread> m_search_threads;

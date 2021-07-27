@@ -45,6 +45,9 @@
     <ClCompile Include="..\src\dist_zero_model.pb.cc">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\config.cc">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\go_comm.h">
@@ -72,6 +75,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="..\src\dist_zero_model.pb.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\config.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

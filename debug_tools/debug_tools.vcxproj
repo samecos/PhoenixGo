@@ -135,6 +135,7 @@
       <ConformanceMode>true</ConformanceMode>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalIncludeDirectories>$(ProjectDir);C:\dev\vcpkg\installed\x64-windows\include;C:\Program Files\TensorRT-7.0.0.11\include;$(CUDA_PATH)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp14</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -146,6 +147,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\src\config.cc" />
     <ClCompile Include="..\src\debug_tool.cc" />
     <ClCompile Include="..\src\dist_config.pb.cc" />
     <ClCompile Include="..\src\dist_zero_model.pb.cc" />
@@ -158,6 +160,7 @@
     <ClCompile Include="..\src\trt_zero_model.cc" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\src\config.h" />
     <ClInclude Include="..\src\dist_config.pb.h" />
     <ClInclude Include="..\src\dist_zero_model.pb.h" />
     <ClInclude Include="..\src\go_comm.h" />

@@ -7,11 +7,13 @@
 
 #include <glog/logging.h>
 
+#include "analyze.h"
 #include "str_utils.h"
+#include "eval_routine.h"
 #include "trt_zero_model.h"
 #include "dist_zero_model_client.h"
 #include "async_dist_zero_model_client.h"
-#include "analyze.h"
+
 static thread_local std::random_device g_random_device;
 static thread_local std::minstd_rand g_random_engine(g_random_device());
 DECLARE_bool(lizzie);
@@ -30,6 +32,7 @@ MCTSEngine::MCTSEngine(const MCTSConfig &config)
 {
     
     std::vector<int> gpu_list;
+    auto eval_batch_loop = new Eval_Routine(this);
     for (const std::string &gpu: SplitStr(m_config.gpu_list(), ',')) {
         gpu_list.push_back(gpu.empty() ? 0 : std::stoi(gpu));
     }
@@ -45,8 +48,10 @@ MCTSEngine::MCTSEngine(const MCTSConfig &config)
         } else if (m_config.model_config().enable_tensorrt()) {
             model.reset(new TrtZeroModel(gpu_list[i % gpu_list.size()]));
         } 
-        m_eval_threads_init_wg.Add();
-        m_eval_threads.emplace_back(&MCTSEngine::EvalRoutine, this, std::move(model));
+        g_eval_threads_init_wg.Add();
+        //g_eval_with_batch_threads.emplace_back(&MCTSEngine::EvalRoutine, this, std::move(model));
+
+        g_eval_with_batch_threads.emplace_back(&Eval_Routine::EvalRoutine_out, eval_batch_loop, std::move(model));
     }
 
     // setup search threads
@@ -66,7 +71,7 @@ MCTSEngine::MCTSEngine(const MCTSConfig &config)
 
     // wait
     LOG(INFO) << "MCTSEngine: waiting all eval threads init";
-    m_eval_threads_init_wg.Wait();
+    g_eval_threads_init_wg.Wait();
     LOG(INFO) << "MCTSEngine: all eval threads init done";
 
     if (m_config.enable_background_search()) {
@@ -76,7 +81,7 @@ MCTSEngine::MCTSEngine(const MCTSConfig &config)
 
 MCTSEngine::~MCTSEngine()
 {
-    m_is_quit = true;
+    g_analyze_thtead_is_quit = true;
     LOG(INFO) << "~MCTSEngine: Deconstructing MCTSEngine";
     m_search_threads_conductor.Terminate();
     LOG(INFO) << "~MCTSEngine: Waiting search threads terminate";
@@ -87,8 +92,8 @@ MCTSEngine::~MCTSEngine()
     LOG(INFO) << "~MCTSEngine: Waiting search apply threads terminate";
 
     LOG(INFO) << "~MCTSEngine: Waiting eval threads terminate";
-    m_eval_task_queue.Close();
-    for (auto &th: m_eval_threads) {
+    g_eval_task_queue.Close();
+    for (auto &th: g_eval_with_batch_threads) {
         th.join();
     }
     LOG(INFO) << "~MCTSEngine: Waiting delete thread terminate";
@@ -323,19 +328,19 @@ void MCTSEngine::Eval(const GoState &board, EvalCallback callback)
         };
 
     if (m_config.enable_async()) {
-        m_eval_tasks_wg.Add();
-        m_eval_task_queue.Push(
+        g_eval_tasks_wg.Add();
+        g_eval_task_queue.Push(
             EvalTask {
                 features,
                 [this, callback](int ret, std::vector<float> policy, float value) {
                     callback(ret, std::move(policy), value);
-                    m_eval_tasks_wg.Done();
+                    g_eval_tasks_wg.Done();
                 }
             }
         );
     } else {
         std::promise<std::tuple<int, std::vector<float>, float>> promise;
-        m_eval_task_queue.Push(
+        g_eval_task_queue.Push(
             EvalTask {
                 features,
                 [&promise](int ret, std::vector<float> policy, float value) {
@@ -349,80 +354,7 @@ void MCTSEngine::Eval(const GoState &board, EvalCallback callback)
         std::tie(ret, policy, value) = promise.get_future().get();
         callback(ret, std::move(policy), value);
     }
-    m_monitor.MonTaskQueueSize(m_eval_task_queue.Size());
-}
-
-void MCTSEngine::EvalRoutine(std::unique_ptr<ZeroModelBase> model)
-{
-    int ret = model->Init(m_config.model_config());
-    CHECK_EQ(ret, 0) << "EvalRoutine: model init failed, ret " << ret;
-
-    int global_step;
-    ret = model->GetGlobalStep(global_step);
-    CHECK_EQ(ret, 0) << "EvalRoutine: model get global_step failed, ret " << ret;
-
-    LOG(INFO) << "EvalRoutine: init model done, global_step=" << global_step;
-    int expect_zero = 0;
-    if (!m_model_global_step.compare_exchange_strong(expect_zero, global_step)) {
-        CHECK_EQ(expect_zero, global_step) << "EvalRoutine: global_step different with other routines";
-    }
-
-    m_eval_threads_init_wg.Done();
-    for (;;) {
-        model->Wait();
-
-        EvalTask task;
-        std::vector<std::vector<bool>> inputs;
-        std::vector<EvalCallback> callbacks;
-        for (int i = 0; i < m_config.eval_batch_size(); ++i) {
-            if (m_eval_task_queue.Pop(task, i ? m_config.eval_wait_batch_timeout_us() : -1)) {
-                inputs.push_back(std::move(task.features));
-                callbacks.push_back(std::move(task.callback));
-            } else if (m_eval_task_queue.IsClose()) {
-                LOG(WARNING) << "EvalRoutine: terminate";
-                return; // terminate
-            } else { // timeout
-                break;
-            }
-        }
-
-        size_t batch_size = inputs.size();
-        m_monitor.MonEvalBatchSize(batch_size);
-
-        Timer timer;
-        model->Forward(
-            inputs,
-            [this, inputs, callbacks, batch_size, timer]
-            (int ret, std::vector<std::vector<float>> policy, std::vector<float> value) {
-                m_monitor.MonEvalCostMsPerBatch(timer.fms());
-
-                // fill result
-                if (ret == ERR_FORWARD_TIMEOUT) {
-                    m_monitor.IncEvalTimeout();
-                    for (size_t i = 0; i < batch_size; ++i) {
-                        m_eval_task_queue.PushFront(EvalTask{std::move(inputs[i]), std::move(callbacks[i])});
-                    }
-                } else if (ret) {
-                    LOG(ERROR) << "EvalRoutine: feed model failed, ret " << ret;
-                    for (size_t i = 0; i < batch_size; ++i) {
-                        callbacks[i](ret, {}, 0.0);
-                    }
-                } else {
-                    CHECK_EQ(batch_size, policy.size())
-                        << "EvalRoutine: batch size unmatch, expect " << batch_size << ", got" << policy.size();
-                    CHECK_EQ(batch_size, value.size())
-                        << "EvalRoutine: batch size unmatch, expect " << batch_size << ", got" << policy.size();
-                    for (size_t i = 0; i < batch_size; ++i) {
-                        callbacks[i](ret, std::move(policy[i]), value[i]);
-                    }
-                }
-            }
-        );
-
-        if (m_config.enable_async()) {
-            m_monitor.MonRpcQueueSize(model->RpcQueueSize());
-        }
-    }
+    m_monitor.MonTaskQueueSize(g_eval_task_queue.Size());
 }
 
 TreeNode *MCTSEngine::Select(GoState &board)
@@ -782,7 +714,7 @@ void MCTSEngine::SearchPause()
     if (m_is_searching) {
         m_search_threads_conductor.Pause();
         m_search_threads_conductor.Join();
-        m_eval_tasks_wg.Wait();
+        g_eval_tasks_wg.Wait();
         m_monitor.Pause();
         m_monitor.Log();
         m_debugger.Debug();
@@ -890,7 +822,7 @@ void MCTSEngine::InitRoot()
                 Backup(m_root, value, ch_len);
             }
         });
-        m_eval_tasks_wg.Wait();
+        g_eval_tasks_wg.Wait();
     }
     if (m_config.enable_dirichlet_noise()) {
         TreeNode *ch = m_root->ch;
@@ -1098,18 +1030,40 @@ void MCTSEngine::OutputAnalysis() {
     }
 
     for (int i = 0; i < m_debugger.GetEngine()->GetRoot()->ch_len; ++i) {
-        TreeNode* node = m_debugger.GetEngine()->GetRoot()->ch;
-
-        std::string move = GoFunction::IdToMoveStr(node[i].move);
-
+        int rank = i;
+        bool m_first = true;
+        int node_visits = 0;
+        float policy = 0.0;
+        float root_action = 0.0;
+        float move_eval = 0.0;
+        std::string move;
+        std::string pv;
+        TreeNode* node = m_debugger.GetEngine()->GetRoot();
         // TODO: use a better way to get pv
-        std::string pv = move + " " + m_debugger.GetMainMovePaths(i);
-
+        while (node->ch_len > rank) {
+            TreeNode* ch = node->ch;
+            std::vector<int> idx(node->ch_len);
+            std::iota(idx.begin(), idx.end(), 0);
+            std::nth_element(idx.begin(), idx.begin() + rank, idx.end(),
+                [ch](int i, int j) { return ch[i].visit_count > ch[j].visit_count; });
+            TreeNode* best_ch = &ch[idx[rank]];
+            pv += GoFunction::IdToMoveStr(best_ch->move);
+            if (m_first)
+            {
+                m_first = false;
+                node_visits = best_ch->visit_count;
+                policy = best_ch->prior_prob * 100;
+                root_action = (float)best_ch->total_action / k_action_value_base / node_visits;
+                move_eval = (root_action + 1) * 50 * 100;
+                move = pv;
+            }
+            pv += " ";
+            node = best_ch;
+            rank = 0;
+        }
+        //node = m_debugger.GetEngine()->GetRoot()->ch;
         // Not sure the meaning of value
-        float root_action = (float)node[i].total_action / k_action_value_base / node[i].visit_count;
-        float move_eval = (root_action + 1) * 50 * 100;
-        float policy = node[i].prior_prob * 100;
-        sortable_data.emplace_back(move, node[i].visit_count, move_eval, policy, pv);
+        sortable_data.emplace_back(move, node_visits, move_eval, policy, pv);
     }
     std::stable_sort(std::begin(sortable_data), std::end(sortable_data));
 
@@ -1125,8 +1079,6 @@ void MCTSEngine::OutputAnalysis() {
     std::cerr << "\n";
 }
 
-
-
 void MCTSEngine::analyzes()
 {
     time_t elapsed, start = clock();
@@ -1139,7 +1091,7 @@ void MCTSEngine::analyzes()
             start = elapsed;
             MCTSEngine::OutputAnalysis();
         }
-        if (m_is_quit)
+        if (g_analyze_thtead_is_quit)
             break;
     }
 }
