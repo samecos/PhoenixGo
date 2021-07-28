@@ -11,6 +11,7 @@
 #include "str_utils.h"
 
 #include "mcts_engine.h"
+#include "eval_routine.h"
 #include "analyze.h"
 
 
@@ -35,8 +36,6 @@ std::unique_ptr<MCTSEngine> InitEngine(const std::string &config_path)
     InitConfig(config_path);
     CHECK(g_config != nullptr) << "Load mcts config file '" << config_path << "' failed";
     LOG(INFO) << "load config succ: \n" << g_config->DebugString();
-    
-    
     return std::unique_ptr<MCTSEngine>(new MCTSEngine(*g_config));
 }
 
@@ -90,36 +89,30 @@ GoStoneColor DecodeColor(const std::string &s)
 
 std::pair<bool, std::string> GTPExecute(MCTSEngine &engine, const std::string &cmd)
 {
+    FLAGS_lizzie = false;
     std::string op;
     std::istringstream ss(cmd);
     ss >> op;
     if (op == "name") {
-        FLAGS_lizzie = false;
         return { true, "Leela Zero" };
     }
     if (op == "version") {
-        FLAGS_lizzie = false;
         return { true, "0.17" };
     }
     if (op == "protocol_version") {
-        FLAGS_lizzie = false;
         return {true, "2"};
     }
     if (op == "list_commands") {
-        FLAGS_lizzie = false;
         return {true, "name\nversion\nprotocol_version\nlist_commands\nquit\nclear_board\nboardsize\nkomi\ntime_settings\ntime_left\nplace_free_handicap\nset_free_handicap\nplay\ngenmove\nfinal_score\nget_debug_info\nget_last_move_debug_info\nundo\nlz-analyze"};
     }
     if (op == "quit") {
-        FLAGS_lizzie = false;
         return {true, ""};
     }
     if (op == "clear_board") {
-        FLAGS_lizzie = false;
         engine.Reset();
         return {true, ""};
     }
     if (op == "boardsize") {
-        FLAGS_lizzie = false;
         int size;
         ss >> size;
         if (size != 19) {
@@ -129,7 +122,6 @@ std::pair<bool, std::string> GTPExecute(MCTSEngine &engine, const std::string &c
         return {true, ""};
     }
     if (op == "komi") {
-        FLAGS_lizzie = false;
         float komi;
         ss >> komi;
         if (komi != 7.5) {
@@ -138,14 +130,12 @@ std::pair<bool, std::string> GTPExecute(MCTSEngine &engine, const std::string &c
         return {true, ""};
     }
     if (op == "time_settings") {
-        FLAGS_lizzie = false;
         int main_time, byo_yomi_time, byo_yomi_stones;
         ss >> main_time >> byo_yomi_time >> byo_yomi_stones;
         engine.GetByoYomiTimer().Set(main_time, byo_yomi_time);
         return {true, ""};
     }
     if (op == "time_left") {
-        FLAGS_lizzie = false;
         std::string color;
         int time, stones;
         ss >> color >> time >> stones;
@@ -157,13 +147,11 @@ std::pair<bool, std::string> GTPExecute(MCTSEngine &engine, const std::string &c
         return {true, ""};
     }
     if (op == "get_remain_time") {
-        FLAGS_lizzie = false;
         std::string color;
         ss >> color;
         return {true, std::to_string(engine.GetByoYomiTimer().GetRemainTime(DecodeColor(color)))};
     }
     if (op == "place_free_handicap") {
-        FLAGS_lizzie = false;
         int num_handicap = 0;
         ss >> num_handicap;
         if (num_handicap > 5) {
@@ -181,7 +169,6 @@ std::pair<bool, std::string> GTPExecute(MCTSEngine &engine, const std::string &c
         return {true, output};
     }
     if (op == "set_free_handicap") {
-        FLAGS_lizzie = false;
         std::string move;
         for (int i = 0; ss >> move; ++i) {
             if (i > 0) engine.Move(-1, -1);
@@ -192,7 +179,6 @@ std::pair<bool, std::string> GTPExecute(MCTSEngine &engine, const std::string &c
         return {true, ""};
     }
     if (op == "play") {
-        FLAGS_lizzie = false;
         ReloadConfig(engine, FLAGS_config_path);
         std::string color, move;
         ss >> color >> move;
@@ -206,7 +192,6 @@ std::pair<bool, std::string> GTPExecute(MCTSEngine &engine, const std::string &c
         return {true, ""};
     }
     if (op == "genmove") {
-        FLAGS_lizzie = false;
         ReloadConfig(engine, FLAGS_config_path);
         std::string color;
         ss >> color;
@@ -220,20 +205,16 @@ std::pair<bool, std::string> GTPExecute(MCTSEngine &engine, const std::string &c
         return {true, EncodeMove(x, y)};
     }
     if (op == "final_score") {
-        FLAGS_lizzie = false;
         GoStoneColor curr = engine.GetBoard().CurrentPlayer();
         return {true, curr == GoComm::BLACK ? "W+0.5" : "B+0.5"};
     }
     if (op == "get_debug_info") {
-        FLAGS_lizzie = false;
         return {true, engine.GetDebugger().GetDebugStr()};
     }
     if (op == "get_last_move_debug_info") {
-        FLAGS_lizzie = false;
         return {true, engine.GetDebugger().GetLastMoveDebugStr()};
     }
     if (op == "undo") {
-        FLAGS_lizzie = false;
         if (!engine.Undo()) {
             return {false, "stack empty"};
         }
@@ -255,6 +236,14 @@ void GTPServing(std::istream &in, std::ostream &out)
     }
     std::cerr << std::flush;
     g_eval_task_queue.Set(engine->GetConfig().eval_task_queue_size());
+    Eval_Routine* elva_batch_thread = new Eval_Routine(*engine);
+    elva_batch_thread->Init();
+    engine->Init();
+    if (FLAGS_lizzie)
+    {
+        g_analyze_thread = std::thread(&MCTSEngine::analyzes, &*engine);
+        FLAGS_lizzie = false;
+    }
     int id;
     bool has_id, succ;
     std::string cmd, output;
@@ -286,6 +275,7 @@ void GTPServing(std::istream &in, std::ostream &out)
             break;
         }
     }
+    delete elva_batch_thread;
     LOG(WARNING) << "exiting gtp serving";
 }
 

@@ -28,55 +28,7 @@ MCTSEngine::MCTSEngine(const MCTSConfig &config)
       m_gen_passes(0),
       m_monitor(this),
       m_debugger(this)
-{
-    
-    std::vector<int> gpu_list;
-    auto eval_batch_loop = new Eval_Routine(this);
-    for (const std::string &gpu: SplitStr(m_config.gpu_list(), ',')) {
-        gpu_list.push_back(gpu.empty() ? 0 : std::stoi(gpu));
-    }
-    for (int i = 0; i < m_config.num_eval_threads(); ++i) {
-        std::unique_ptr<ZeroModelBase> model;
-        if (m_config.enable_dist()) {
-            const auto &addr = m_config.dist_svr_addrs(i % m_config.dist_svr_addrs_size());
-            if (m_config.enable_async()) {
-                model.reset(new AsyncDistZeroModelClient(SplitStr(addr, ','), m_config.dist_config()));
-            } else {
-                model.reset(new DistZeroModelClient(addr, m_config.dist_config()));
-            }
-        } else if (m_config.model_config().enable_tensorrt()) {
-            model.reset(new TrtZeroModel(gpu_list[i % gpu_list.size()]));
-        } 
-        g_eval_threads_init_wg.Add();
-        //g_eval_with_batch_threads.emplace_back(&MCTSEngine::EvalRoutine, this, std::move(model));
-
-        g_eval_with_batch_threads.emplace_back(&Eval_Routine::EvalRoutine_out, eval_batch_loop, std::move(model));
-    }
-
-    // setup search threads
-    for (int i = 0; i < m_config.num_search_threads(); ++i) {
-        m_search_threads.emplace_back(&MCTSEngine::SearchRoutine, this);
-    }
-
-    // setup delete thread & tree root
-    m_delete_thread = std::thread(&MCTSEngine::DeleteRoutine, this);
-    if (FLAGS_lizzie)
-    {
-        m_analyze_thread = std::thread(&MCTSEngine::analyzes, this);
-        FLAGS_lizzie = false;
-    }
-
-    ChangeRoot(nullptr);
-
-    // wait
-    LOG(INFO) << "MCTSEngine: waiting all eval threads init";
-    g_eval_threads_init_wg.Wait();
-    LOG(INFO) << "MCTSEngine: all eval threads init done";
-
-    if (m_config.enable_background_search()) {
-        SearchResume();
-    }
-}
+{}
 
 MCTSEngine::~MCTSEngine()
 {
@@ -88,7 +40,7 @@ MCTSEngine::~MCTSEngine()
     for (auto &th: m_search_threads) {
         th.join();
     }
-    m_analyze_thread.join();
+    g_analyze_thread.join();
     LOG(INFO) << "~MCTSEngine: Waiting eval threads terminate";
     g_eval_task_queue.Close();
     for (auto &th: g_eval_with_batch_threads) {
@@ -101,6 +53,28 @@ MCTSEngine::~MCTSEngine()
     
     LOG(INFO) << "~MCTSEngine: Deconstruct MCTSEngin succ";
 }
+
+void MCTSEngine::Init()
+{
+    // setup search threads
+    for (int i = 0; i < m_config.num_search_threads(); ++i) {
+        m_search_threads.emplace_back(&MCTSEngine::SearchRoutine, this);
+    }
+
+    // setup delete thread & tree root
+    m_delete_thread = std::thread(&MCTSEngine::DeleteRoutine, this);
+    ChangeRoot(nullptr);
+
+    // wait
+    LOG(INFO) << "MCTSEngine: waiting all eval threads init";
+    g_eval_threads_init_wg.Wait();
+    LOG(INFO) << "MCTSEngine: all eval threads init done";
+
+    if (m_config.enable_background_search()) {
+        SearchResume();
+    }
+}
+
 
 void MCTSEngine::Reset(const std::string &init_moves)
 {
@@ -1028,14 +1002,10 @@ void MCTSEngine::OutputAnalysis() {
     }
 
     for (int i = 0; i < m_debugger.GetEngine()->GetRoot()->ch_len; ++i) {
-        int rank = i;
+        int rank = i, node_visits = 0;
+        std::string move, pv;
+        float policy = 0.0, root_action = 0.0, move_eval = 0.0;
         bool m_first = true;
-        int node_visits = 0;
-        float policy = 0.0;
-        float root_action = 0.0;
-        float move_eval = 0.0;
-        std::string move;
-        std::string pv;
         TreeNode* node = m_debugger.GetEngine()->GetRoot();
         // TODO: use a better way to get pv
         while (node->ch_len > rank) {

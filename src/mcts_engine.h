@@ -54,6 +54,8 @@ class MCTSEngine
     MCTSEngine(const MCTSConfig &config);
     ~MCTSEngine();
 
+    void Init();
+    void analyzes();
     void Reset(const std::string &init_moves="");
     void Move(GoCoordId x, GoCoordId y);
     void GenMove(GoCoordId &x, GoCoordId &y);
@@ -121,7 +123,7 @@ class MCTSEngine
 
     bool IsPassDisable();
     void MCTSEngine::OutputAnalysis();
-    void MCTSEngine::analyzes();
+    
     
     
  private:

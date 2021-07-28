@@ -3,15 +3,47 @@
 #include <glog/logging.h>
 
 #include "timer.h"
+#include "str_utils.h"
 #include "trt_zero_model.h"
 #include "dist_zero_model_client.h"
 #include "async_dist_zero_model_client.h"
-Eval_Routine::Eval_Routine(MCTSEngine* engine)
-    : m_monitor(engine)
+Eval_Routine::Eval_Routine(MCTSEngine& engine)
+    : m_monitor(&engine)
 {}
 
 Eval_Routine::~Eval_Routine()
 {}
+
+bool Eval_Routine::Init()
+{
+    std::vector<int> gpu_list;
+    
+    for (const std::string& gpu : SplitStr(g_config->gpu_list(), ',')) {
+        gpu_list.push_back(gpu.empty() ? 0 : std::stoi(gpu));
+    }
+    for (int i = 0; i < g_config->num_eval_threads(); ++i) {
+        std::unique_ptr<ZeroModelBase> model;
+        if (g_config->enable_dist()) {
+            const auto& addr = g_config->dist_svr_addrs(i % g_config->dist_svr_addrs_size());
+            if (g_config->enable_async()) {
+                model.reset(new AsyncDistZeroModelClient(SplitStr(addr, ','), g_config->dist_config()));
+            }
+            else {
+                model.reset(new DistZeroModelClient(addr, g_config->dist_config()));
+            }
+        }
+        else if (g_config->model_config().enable_tensorrt()) {
+            model.reset(new TrtZeroModel(gpu_list[i % gpu_list.size()]));
+        }
+        g_eval_threads_init_wg.Add();
+        //g_eval_with_batch_threads.emplace_back(&MCTSEngine::EvalRoutine, this, std::move(model));
+
+        g_eval_with_batch_threads.emplace_back(&Eval_Routine::EvalRoutine_out, this, std::move(model));
+    }
+
+
+    return true;
+}
 
 void Eval_Routine::EvalRoutine_out(std::unique_ptr<ZeroModelBase> model)
 {

@@ -9,8 +9,10 @@
 class Eval_Routine
 {
 public:
-	Eval_Routine(MCTSEngine* engine);
+	Eval_Routine(MCTSEngine& engine);
 	~Eval_Routine();
+
+	bool Init();
 
 	void EvalRoutine_out(std::unique_ptr<ZeroModelBase> model);
 
