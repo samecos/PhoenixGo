@@ -38,9 +38,9 @@
     <ClCompile Include="..\src\mcts_config.pb.cc" />
     <ClCompile Include="..\src\mcts_debugger.cc" />
     <ClCompile Include="..\src\mcts_engine.cc" />
-    <ClCompile Include="..\src\mcts_eval.cc" />
     <ClCompile Include="..\src\mcts_main.cc" />
     <ClCompile Include="..\src\mcts_monitor.cc" />
+    <ClCompile Include="..\src\mcts_selfplay.cc" />
     <ClCompile Include="..\src\model_config.pb.cc" />
     <ClCompile Include="..\src\str_utils.cc" />
     <ClCompile Include="..\src\thread_conductor.cc" />
@@ -68,8 +68,8 @@
     <ClInclude Include="..\src\mcts_config.pb.h" />
     <ClInclude Include="..\src\mcts_debugger.h" />
     <ClInclude Include="..\src\mcts_engine.h" />
-    <ClInclude Include="..\src\mcts_eval.h" />
     <ClInclude Include="..\src\mcts_monitor.h" />
+    <ClInclude Include="..\src\mcts_selfplay.h" />
     <ClInclude Include="..\src\model_config.pb.h" />
     <ClInclude Include="..\src\str_utils.h" />
     <ClInclude Include="..\src\task_queue.h" />
@@ -186,7 +186,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <PreprocessorDefinitions>_WIN32_WINNT=0x0A00;GOOGLE_TENSORRT=1;GLOG_NO_ABBREVIATED_SEVERITIES;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_WIN32_WINNT=0x0A00;GOOGLE_TENSORRT=1;GLOG_NO_ABBREVIATED_SEVERITIES;_AFXEXT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DisableLanguageExtensions>false</DisableLanguageExtensions>
       <AdditionalIncludeDirectories>$(ProjectDir);$(CUDA_PATH)\include;C:\dev\vcpkg\installed\x64-windows\include;C:\Program Files\TensorRT-7.0.0.11\include;$(ProjectDir)\..\src\address_sorting\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>

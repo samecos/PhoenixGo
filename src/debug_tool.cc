@@ -63,7 +63,7 @@ int main(int argc, char* argv[])
     google::InitGoogleLogging(argv[0]);
     google::InstallFailureSignalHandler();
 
-    LoadConfig(FLAGS_config_path);
+    InitConfig(FLAGS_config_path);
     CHECK(g_config != nullptr) << "Load mcts config file '" << FLAGS_config_path << "' failed";
 
     std::unique_ptr<ZeroModelBase> model(new TrtZeroModel(FLAGS_gpu));

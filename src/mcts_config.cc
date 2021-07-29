@@ -24,14 +24,14 @@ void LoadConfig(const char *config_path)
     //return config;
 }
 
- void LoadConfig(const std::string &config_path)
-{
-    LoadConfig(config_path.c_str());
-}
+// void LoadConfig(const std::string &config_path)
+//{
+//    LoadConfig(config_path.c_str());
+//}
 
 void InitConfig(const std::string& config_path)
 {
-    LoadConfig(config_path);
+    LoadConfig(config_path.c_str());
     if (g_config == nullptr) {
         return ;
     }

@@ -5,6 +5,7 @@
 #include <numeric>
 #include <random>
 
+#include <gflags/gflags.h>
 #include <glog/logging.h>
 
 #include "analyze.h"
@@ -18,6 +19,8 @@ static thread_local std::random_device g_random_device;
 static thread_local std::minstd_rand g_random_engine(g_random_device());
 DECLARE_bool(lizzie);
 
+
+
 MCTSEngine::MCTSEngine(const MCTSConfig &config)
     : m_config(config),
       m_root(nullptr),
@@ -27,30 +30,46 @@ MCTSEngine::MCTSEngine(const MCTSConfig &config)
       m_num_moves(0),
       m_gen_passes(0),
       m_monitor(this),
-      m_debugger(this)
+      m_debugger(this),
+      m_selfplay_is_over(false),
+      m_engine_id(0)
 {}
+
+MCTSEngine::MCTSEngine(const MCTSConfig& config,int id)
+    : m_config(config),
+    m_root(nullptr),
+    m_board(!config.disable_positional_superko()),
+    m_is_searching(false),
+    m_simulation_counter(0),
+    m_num_moves(0),
+    m_gen_passes(0),
+    m_monitor(this),
+    m_debugger(this),
+    m_selfplay_is_over(false),
+    m_engine_id(id)
+{}
+
+
+
 
 MCTSEngine::~MCTSEngine()
 {
+    if (m_selfplay_thread.joinable())
+        m_selfplay_thread.join();
     //g_analyze_thtead_is_quit = true;
     LOG(INFO) << "~MCTSEngine: Deconstructing MCTSEngine";
-    m_search_threads_conductor.Terminate();
+    if(!m_search_threads_conductor.IsTerminate())
+        m_search_threads_conductor.Terminate();
     LOG(INFO) << "~MCTSEngine: Waiting search threads terminate";
     LOG(INFO) << "~MCTSEngine: Waiting search apply threads terminate";
     for (auto &th: m_search_threads) {
-        th.join();
-    }
-    g_analyze_thread.join();
-    LOG(INFO) << "~MCTSEngine: Waiting eval threads terminate";
-    g_eval_task_queue.Close();
-    for (auto &th: g_eval_with_batch_threads) {
         th.join();
     }
     LOG(INFO) << "~MCTSEngine: Waiting delete thread terminate";
     m_delete_queue.Push(m_root);
     m_delete_queue.Close();
     m_delete_thread.join();
-    
+
     LOG(INFO) << "~MCTSEngine: Deconstruct MCTSEngin succ";
 }
 
@@ -60,21 +79,30 @@ void MCTSEngine::Init()
     for (int i = 0; i < m_config.num_search_threads(); ++i) {
         m_search_threads.emplace_back(&MCTSEngine::SearchRoutine, this);
     }
-
     // setup delete thread & tree root
     m_delete_thread = std::thread(&MCTSEngine::DeleteRoutine, this);
     ChangeRoot(nullptr);
-
-    // wait
-    LOG(INFO) << "MCTSEngine: waiting all eval threads init";
-    g_eval_threads_init_wg.Wait();
-    LOG(INFO) << "MCTSEngine: all eval threads init done";
-
     if (m_config.enable_background_search()) {
         SearchResume();
     }
 }
 
+void MCTSEngine::InitSelfplay(int single_thread)
+{
+    // setup search threads
+    for (int i = 0; i < m_config.num_search_threads(); ++i) {
+        m_search_threads.emplace_back(&MCTSEngine::SearchRoutine, this);
+    }
+    // setup delete thread & tree root
+    m_delete_thread = std::thread(&MCTSEngine::DeleteRoutine, this);
+    ChangeRoot(nullptr);
+    // wait
+    m_selfplay_thread = std::thread(&MCTSEngine::RunSelfplay, this, single_thread);
+    LOG(INFO) << "Start Selfplay   " << m_engine_id<< "    OK! Started!";
+    if (m_config.enable_background_search()) {
+        SearchResume();
+    }
+}
 
 void MCTSEngine::Reset(const std::string &init_moves)
 {
@@ -230,6 +258,47 @@ ByoYomiTimer &MCTSEngine::GetByoYomiTimer()
     return m_byo_yomi_timer;
 }
 
+bool MCTSEngine::RunOnce()
+{
+    GoCoordId x = -1, y = -1;
+    GenMove(x, y);
+    TreeNode* node = m_debugger.GetEngine()->m_root->ch;
+    float sumvisits = m_debugger.GetEngine()->m_root->visit_count;
+    int length = m_debugger.GetEngine()->m_root->ch_len;
+    std::vector<float> probslist((GoComm::GOBOARD_SIZE), 0.0);
+    for (int i = 0; i < length; ++i)
+    {
+        if(node[i].visit_count != 0)
+            probslist[node[i].move] = (float)node[i].visit_count / sumvisits;
+    }
+    auto features = m_board.GetFeature();
+    Move(x, y);
+    if ((!m_config.disable_double_pass_scoring() && m_board.IsDoublePass()) || GoFunction::IsResign(x, y))
+    {
+        return true;
+    }
+    return false;
+}
+
+void MCTSEngine::RunSelfplay(int single_thread)
+{
+    for (int count = 0; count < single_thread; ++count)
+    {
+        for (int movesnum = 0; movesnum < 500 ; ++movesnum)
+        {
+            if (RunOnce())
+            {
+                break;
+            }
+        }
+    }
+    std::cerr << m_engine_id << "   "<< m_engine_id << std::endl;
+    
+    m_selfplay_is_over = true;
+    if (!m_search_threads_conductor.IsTerminate())
+        m_search_threads_conductor.Terminate();
+    return;
+}
 
 TreeNode *MCTSEngine::InitNode(TreeNode *node, TreeNode *fa, int move, float prior_prob)
 {
@@ -1053,11 +1122,6 @@ void MCTSEngine::analyzes()
     float elapsed_time;
     int count = 0;
     for (;;) {
-        if (m_search_threads_conductor.IsTerminate())
-        {
-            LOG(WARNING) << "search apply threads: terminate";
-            return;
-        }
         elapsed = clock();
         elapsed_time = float(elapsed - start);
         if (elapsed_time > 200 && FLAGS_lizzie) { // 5 outputs per second

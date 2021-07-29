@@ -51,10 +51,14 @@ const int k_expanded = 2;
 class MCTSEngine
 {
  public:
+
     MCTSEngine(const MCTSConfig &config);
+    MCTSEngine(const MCTSConfig& config, int id);
     ~MCTSEngine();
 
+
     void Init();
+    void InitSelfplay(int single_thread);
     void analyzes();
     void Reset(const std::string &init_moves="");
     void Move(GoCoordId x, GoCoordId y);
@@ -71,7 +75,19 @@ class MCTSEngine
     {
         return m_root;
     }
-    
+    void RunSelfplay(int single_thread);
+    bool GetStatus()
+    {
+        return m_selfplay_is_over;
+    }
+    int GetEngineID()
+    {
+        return m_engine_id;
+    }
+    int SetEngineID(int id)
+    {
+        return m_engine_id = id;
+    }
  private:
     TreeNode *InitNode(TreeNode *node, TreeNode *fa, int move, float prior_prob);
     TreeNode *FindChild(TreeNode *node, int move);
@@ -123,7 +139,7 @@ class MCTSEngine
 
     bool IsPassDisable();
     void MCTSEngine::OutputAnalysis();
-    
+    bool MCTSEngine::RunOnce();
     
     
  private:
@@ -132,7 +148,7 @@ class MCTSEngine
 
     TreeNode *m_root;
     GoState m_board;
-
+    bool m_selfplay_is_over;
 
 
     std::vector<std::thread> m_search_threads;
@@ -140,7 +156,8 @@ class MCTSEngine
     bool m_is_searching;
 
     std::thread m_delete_thread;
-    std::thread m_analyze_thread;
+    std::thread m_selfplay_thread;
+    //std::thread m_analyze_thread;
     TaskQueue<TreeNode*> m_delete_queue;
 
     std::atomic<int> m_simulation_counter;
@@ -150,6 +167,7 @@ class MCTSEngine
     std::string m_moves_str;
 
     int m_gen_passes;
+    int m_engine_id;
 
     ByoYomiTimer m_byo_yomi_timer;
 

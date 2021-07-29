@@ -21,7 +21,10 @@ DEFINE_string(config_path, "", "Path of mcts config file.");
 DEFINE_string(gpu_list, "", "List of gpus used by neural network.");
 DEFINE_string(init_moves, "", "Initialize Go board with init_moves.");
 DEFINE_bool(gtp, false, "Run as gtp server.");
+DEFINE_bool(selfplay, false, "Run as selfplay server");
 DEFINE_int32(listen_port, 0, "Listen which port.");
+DEFINE_int32(selfplay_thread_num, 0, "Nums of run async selfplay nums");
+DEFINE_int32(games_num, 5000, "Total Games Num Run");
 DEFINE_string(allow_ip, "", "List of client ip allowed to connect, seperated by comma.");
 #if !defined(_WIN32) && !defined(_WIN64)
 DEFINE_bool(fork_per_request, true, "Fork for each request or not.");
@@ -37,6 +40,16 @@ std::unique_ptr<MCTSEngine> InitEngine(const std::string &config_path)
     CHECK(g_config != nullptr) << "Load mcts config file '" << config_path << "' failed";
     LOG(INFO) << "load config succ: \n" << g_config->DebugString();
     return std::unique_ptr<MCTSEngine>(new MCTSEngine(*g_config));
+}
+
+std::unique_ptr<MCTSEngine> InitSelfplayEngine()
+{
+    return std::unique_ptr<MCTSEngine>(new MCTSEngine(*g_config));
+}
+
+std::unique_ptr<MCTSEngine> InitSelfplayEngine(int id)
+{
+    return std::unique_ptr<MCTSEngine>(new MCTSEngine(*g_config, id));
 }
 
 void ReloadConfig(MCTSEngine &engine, const std::string &config_path)
@@ -235,13 +248,17 @@ void GTPServing(std::istream &in, std::ostream &out)
         engine->Reset(FLAGS_init_moves);
     }
     std::cerr << std::flush;
-    g_eval_task_queue.Set(engine->GetConfig().eval_task_queue_size());
-    Eval_Routine* elva_batch_thread = new Eval_Routine(*engine);
+    g_eval_task_queue.Set(g_config->eval_task_queue_size());
+    //Eval_Routine* elva_batch_thread = new Eval_Routine(*engine);
+    Eval_Routine* elva_batch_thread = new Eval_Routine();
     elva_batch_thread->Init();
+    LOG(INFO) << "MCTSEngine: waiting all eval threads init";
+    g_eval_threads_init_wg.Wait();
+    LOG(INFO) << "MCTSEngine: all eval threads init done";
     engine->Init();
     if (FLAGS_lizzie)
     {
-        g_analyze_thread = std::thread(&MCTSEngine::analyzes, &*engine);
+        g_analyze_thread = std::thread(&MCTSEngine::analyzes, engine.get());
         FLAGS_lizzie = false;
     }
     int id;
@@ -275,7 +292,6 @@ void GTPServing(std::istream &in, std::ostream &out)
             break;
         }
     }
-    delete elva_batch_thread;
     LOG(WARNING) << "exiting gtp serving";
 }
 
@@ -285,7 +301,14 @@ void GenMoveOnce()
     if (FLAGS_init_moves.size()) {
         engine->Reset(FLAGS_init_moves);
     }
-
+    g_eval_task_queue.Set(g_config->eval_task_queue_size());
+    //Eval_Routine* elva_batch_thread = new Eval_Routine(*engine);
+    Eval_Routine* elva_batch_thread = new Eval_Routine();
+    elva_batch_thread->Init();
+    LOG(INFO) << "MCTSEngine: waiting all eval threads init";
+    g_eval_threads_init_wg.Wait();
+    LOG(INFO) << "MCTSEngine: all eval threads init done";
+    engine->Init();
     GoCoordId x, y;
     engine->GenMove(x, y);
     engine->Move(x, y);
@@ -346,6 +369,10 @@ void GTPServingOnPort(int port)
 #endif
     }
 }
+struct myclass {           // function object type:
+    int operator() (std::unique_ptr<MCTSEngine> x) { if (x->GetStatus()) return 1; else return 0; }
+} myobject;
+
 
 int main(int argc, char* argv[])
 {
@@ -353,13 +380,63 @@ int main(int argc, char* argv[])
     google::InitGoogleLogging(argv[0]);
     google::InstallFailureSignalHandler();
 
-     if (FLAGS_gtp) {
+    if (FLAGS_gtp) 
+    {
         if (FLAGS_listen_port == 0) {
             GTPServing(std::cin, std::cout);
         } else {
             GTPServingOnPort(FLAGS_listen_port);
         }
-    } else {
+    } 
+    else if (FLAGS_selfplay)
+    {
+        int c_count = 0;
+        int single_thread = FLAGS_games_num / FLAGS_selfplay_thread_num;
+        InitConfig(FLAGS_config_path);
+        g_eval_task_queue.Set(g_config->eval_task_queue_size());
+        Eval_Routine* elva_batch_thread = new Eval_Routine();
+        elva_batch_thread->InitSelfplay();
+        LOG(INFO) << "MCTSEngine: waiting all eval threads init";
+        g_eval_threads_init_wg.Wait();
+        LOG(INFO) << "MCTSEngine: all eval threads init done";
+        std::vector<std::unique_ptr<MCTSEngine>> engines;
+        //std::unique_ptr<MCTSEngine[]> manyengine(new MCTSEngine[FLAGS_selfplay_thread_num]);
+        //Æô¶¯ËÑË÷Ïß³Ì
+        for (int i = 0; i < FLAGS_selfplay_thread_num; ++i)
+        {
+            auto engine = InitSelfplayEngine(i);
+            engine->InitSelfplay(single_thread);
+            engines.push_back(std::move(engine));
+        }
+        for (; ; )
+        {
+            Sleep(10000);
+            c_count = 0;
+            for (int i = 0; i < FLAGS_selfplay_thread_num; ++i)
+            {
+                if (engines.at(i)->GetStatus())
+                {
+                    ++c_count;
+                }
+            }
+            if (c_count = FLAGS_selfplay_thread_num)
+                break;
+        }
+    }
+    else 
+    {
         GenMoveOnce();
+    }
+    std::cout << 1234567890987654321 << std::endl;
+    std::cout << g_analyze_thread.get_id() << std::endl;
+    if (g_analyze_thread.joinable())
+    {
+        LOG(WARNING) << "search apply threads: terminate";
+        g_analyze_thread.join();
+    }
+    g_eval_task_queue.Close();
+    LOG(INFO) << "main:: Waiting eval threads terminate";
+    for (auto& th : g_eval_with_batch_threads) {
+        th.join();
     }
 }
