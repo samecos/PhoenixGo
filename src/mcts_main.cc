@@ -400,17 +400,18 @@ int main(int argc, char* argv[])
         g_eval_threads_init_wg.Wait();
         LOG(INFO) << "MCTSEngine: all eval threads init done";
         std::vector<std::unique_ptr<MCTSEngine>> engines;
-        //std::unique_ptr<MCTSEngine[]> manyengine(new MCTSEngine[FLAGS_selfplay_thread_num]);
-        //Æô¶¯ËÑË÷Ïß³Ì
+
         for (int i = 0; i < FLAGS_selfplay_thread_num; ++i)
         {
-            auto engine = InitSelfplayEngine(i);
-            engine->InitSelfplay(single_thread);
-            engines.push_back(std::move(engine));
+            //auto engine = InitSelfplayEngine(i);
+            //engine->InitSelfplay(single_thread);
+            //engines.emplace_back(std::move(engine));
+            engines.emplace_back(new MCTSEngine(*g_config, i));
+            engines.back()->InitSelfplay(single_thread);
         }
         for (; ; )
         {
-            Sleep(10000);
+            //Sleep(10000);
             c_count = 0;
             for (int i = 0; i < FLAGS_selfplay_thread_num; ++i)
             {
@@ -427,8 +428,6 @@ int main(int argc, char* argv[])
     {
         GenMoveOnce();
     }
-    std::cout << 1234567890987654321 << std::endl;
-    std::cout << g_analyze_thread.get_id() << std::endl;
     if (g_analyze_thread.joinable())
     {
         LOG(WARNING) << "search apply threads: terminate";

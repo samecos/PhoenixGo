@@ -76,12 +76,13 @@ MCTSEngine::~MCTSEngine()
 void MCTSEngine::Init()
 {
     // setup search threads
-    for (int i = 0; i < m_config.num_search_threads(); ++i) {
-        m_search_threads.emplace_back(&MCTSEngine::SearchRoutine, this);
-    }
+
     // setup delete thread & tree root
     m_delete_thread = std::thread(&MCTSEngine::DeleteRoutine, this);
     ChangeRoot(nullptr);
+    for (int i = 0; i < m_config.num_search_threads(); ++i) {
+        m_search_threads.emplace_back(&MCTSEngine::SearchRoutine, this);
+    }
     if (m_config.enable_background_search()) {
         SearchResume();
     }
@@ -149,14 +150,19 @@ void MCTSEngine::Move(GoCoordId x, GoCoordId y)
     ++m_num_moves;
     if (m_moves_str.size()) m_moves_str += ",";
     m_moves_str += GoFunction::CoordToStr(x, y);
+
+    if (m_show_moves_str.size()) m_show_moves_str += ",";
+    m_show_moves_str += GoFunction::CoordToMoveStr(x, y);
+
     LOG(INFO) << "Move: " << m_moves_str;
+    LOG(INFO) << "Move_2: " << m_show_moves_str;
 
     ChangeRoot(FindChild(m_root, GoFunction::CoordToId(x, y)));
     m_root->move = GoFunction::CoordToId(x, y);
 
-    m_debugger.UpdateLastMoveDebugStr();
-    LOG(INFO) << m_debugger.GetLastMoveDebugStr();
-    m_debugger.PrintTree(1, 10, GoFunction::CoordToStr(x, y) + ",");
+    //m_debugger.UpdateLastMoveDebugStr();
+    //LOG(INFO) << m_debugger.GetLastMoveDebugStr();
+    //m_debugger.PrintTree(1, 10, GoFunction::CoordToMoveStr(x, y) + ",");
 
     m_byo_yomi_timer.HandOff();
 
@@ -261,11 +267,12 @@ ByoYomiTimer &MCTSEngine::GetByoYomiTimer()
 bool MCTSEngine::RunOnce()
 {
     GoCoordId x = -1, y = -1;
+    VLOG(1) << "eval task queue size is:  " << g_eval_task_queue.Size();
     GenMove(x, y);
     TreeNode* node = m_debugger.GetEngine()->m_root->ch;
     float sumvisits = m_debugger.GetEngine()->m_root->visit_count;
     int length = m_debugger.GetEngine()->m_root->ch_len;
-    std::vector<float> probslist((GoComm::GOBOARD_SIZE), 0.0);
+    std::vector<float> probslist((GoComm::GOBOARD_SIZE + 1), 0.0);
     for (int i = 0; i < length; ++i)
     {
         if(node[i].visit_count != 0)
@@ -273,6 +280,7 @@ bool MCTSEngine::RunOnce()
     }
     auto features = m_board.GetFeature();
     Move(x, y);
+
     if ((!m_config.disable_double_pass_scoring() && m_board.IsDoublePass()) || GoFunction::IsResign(x, y))
     {
         return true;
@@ -290,10 +298,13 @@ void MCTSEngine::RunSelfplay(int single_thread)
             {
                 break;
             }
+            
+            VLOG(1) << "Thread, ID:   " << m_engine_id
+                << "  ,  " << count + 1 << "th game  ,  "
+                << "selfplay is over ?   " << (m_selfplay_is_over ? "true" : "false");
+
         }
     }
-    std::cerr << m_engine_id << "   "<< m_engine_id << std::endl;
-    
     m_selfplay_is_over = true;
     if (!m_search_threads_conductor.IsTerminate())
         m_search_threads_conductor.Terminate();
@@ -755,10 +766,10 @@ void MCTSEngine::SearchPause()
     if (m_is_searching) {
         m_search_threads_conductor.Pause();
         m_search_threads_conductor.Join();
-        g_eval_tasks_wg.Wait();
+        //g_eval_tasks_wg.Wait();
         m_monitor.Pause();
-        m_monitor.Log();
-        m_debugger.Debug();
+        //m_monitor.Log();
+        //m_debugger.Debug();
 
         m_is_searching = false;
     }
@@ -942,9 +953,9 @@ int MCTSEngine::GetBestMove(float &v_resign)
             value[i] = ch[i].value;
         }
 
-        VLOG(2) << "GetBestMove: " << GoFunction::IdToStr(ch[i].move)
-                << ", N " << visit_count[i] << ", W " << total_action[i] << ", Q " << mean_action[i]
-                << ", p " << prior_prob[i] << ", v " << value[i];
+        //VLOG(2) << "GetBestMove: " << GoFunction::IdToMoveStr(ch[i].move)
+        //        << ", N " << visit_count[i] << ", W " << total_action[i] << ", Q " << mean_action[i]
+        //        << ", p " << prior_prob[i] << ", v " << value[i];
     }
     int choice = 0;
     switch (m_config.get_best_move_mode()) {
@@ -1122,6 +1133,11 @@ void MCTSEngine::analyzes()
     float elapsed_time;
     int count = 0;
     for (;;) {
+        if (m_search_threads_conductor.IsTerminate())
+        {
+            LOG(WARNING) << "search apply threads: terminate";
+            return;
+        }
         elapsed = clock();
         elapsed_time = float(elapsed - start);
         if (elapsed_time > 200 && FLAGS_lizzie) { // 5 outputs per second

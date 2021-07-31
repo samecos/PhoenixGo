@@ -165,7 +165,7 @@ class MCTSEngine
 
     int m_num_moves;
     std::string m_moves_str;
-
+    std::string m_show_moves_str;
     int m_gen_passes;
     int m_engine_id;
 
