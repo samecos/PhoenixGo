@@ -1,6 +1,4 @@
-#pragma once
 #include "config.h"
-
 
 TaskQueue<EvalTask> g_eval_task_queue(0);
 

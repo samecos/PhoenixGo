@@ -1,10 +1,12 @@
 #pragma once
 #include <gflags/gflags.h>
 #include <vector>
+#include <thread>
 #include <functional>
 #include "task_queue.h"
 #include "wait_group.h"
 #include "mcts_config.h"
+
 DECLARE_bool(lizzie);
 
 typedef std::function<void(int, std::vector<float>, float)> EvalCallback;

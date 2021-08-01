@@ -138,8 +138,8 @@ class MCTSEngine
     bool EvalCacheFind(uint64_t hash, std::vector<float> &policy, float &value);
 
     bool IsPassDisable();
-    void MCTSEngine::OutputAnalysis();
-    bool MCTSEngine::RunOnce();
+    void OutputAnalysis();
+    bool RunOnce();
     
     
  private:
