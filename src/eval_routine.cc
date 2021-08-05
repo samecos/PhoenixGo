@@ -124,8 +124,6 @@ void Eval_Routine::EvalRoutine_out(std::unique_ptr<ZeroModelBase> model, bool is
                 else {
                     CHECK_EQ(batch_size, policy.size())
                         << "EvalRoutine: batch size unmatch, expect " << batch_size << ", got" << policy.size();
-                    CHECK_EQ(batch_size, value.size())
-                        << "EvalRoutine: batch size unmatch, expect " << batch_size << ", got" << policy.size();
                     for (size_t i = 0; i < batch_size; ++i) {
                         callbacks[i](ret, std::move(policy[i]), value[i]);
                     }
