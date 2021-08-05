@@ -22,7 +22,7 @@ clang:
 		mcts_main
 
 DYNAMIC_LIBS = -lboost_filesystem -lupb -lcares -lgpr -lgrpc++ -lgrpc++_unsecure -lgrpc_unsecure -lprotobuf -lglog -lgflags -lz -labsl_base 
-LIBS =
+LIBS = -lpthread
 
 CXXFLAGS += -I/opt/homebrew/include 
 CXXFLAGS += -I./
