@@ -203,7 +203,7 @@ class GoState {
 
     ~GoState();
 
-
+    inline uint64_t GetZobristHashValue() const { return zobrist_hash_value_; }
     // basic functions
     GoSize CalcScore(GoSize &black, GoSize &white, GoSize &empty) const;
 

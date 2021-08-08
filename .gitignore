@@ -19,3 +19,15 @@ x86
 Release
 Debug
 .clang
+/scripts/zero.ckpt-20b-v1.uff
+/scripts/zero.ckpt-20b-v1.transformed.pb
+/scripts/zero.ckpt-20b-v1.optimized.pb
+/scripts/zero.ckpt-20b-v1.index
+/scripts/zero.ckpt-20b-v1.frozen.pb
+/scripts/zero.ckpt-20b-v1.FP32.PLAN
+/scripts/zero.ckpt-20b-v1.data-00000-of-00001
+/scripts/meta_graph
+/scripts/glog.dll
+/scripts/gflags.dll
+/scripts/checkpoint
+/scripts/build_tensorrt_model.exe

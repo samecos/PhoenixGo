@@ -4,7 +4,6 @@
 #include <functional>
 
 #include "errordef.h"
-
 #include "model_config.pb.h"
 
 class ZeroModelBase

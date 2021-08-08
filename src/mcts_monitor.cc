@@ -65,7 +65,7 @@ void MCTSMonitor::Reset()
 
 void MCTSMonitor::Log()
 {
-    /*VLOG(0) << "MCTSMonitor: avg eval cost " << AvgEvalCostMs() << "ms";
+    VLOG(0) << "MCTSMonitor: avg eval cost " << AvgEvalCostMs() << "ms";
     VLOG(0) << "MCTSMonitor: max eval cost " << MaxEvalCostMs() << "ms";
     VLOG(0) << "MCTSMonitor: avg eval cost " << AvgEvalCostMsPerBatch() << "ms per batch";
     VLOG(0) << "MCTSMonitor: max eval cost " << MaxEvalCostMsPerBatch() << "ms per batch";
@@ -82,7 +82,7 @@ void MCTSMonitor::Log()
     VLOG(0) << "MCTSMonitor: select same node " << SelectSameNode() << " times";
     VLOG(0) << "MCTSMonitor: search tree height is " << MaxSearchTreeHeight();
     VLOG(0) << "MCTSMonitor: avg height of nodes is " << AvgSearchTreeHeight();
-    VLOG(0) << "MCTSMonitor: avg eval task queue size is " << AvgTaskQueueSize();*/
+    VLOG(0) << "MCTSMonitor: avg eval task queue size is " << AvgTaskQueueSize();
 
 
     if (m_engine->GetConfig().enable_async()) {

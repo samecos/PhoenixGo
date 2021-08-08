@@ -8,5 +8,6 @@ WaitGroup g_eval_threads_init_wg;
 WaitGroup g_eval_tasks_wg;
 
 std::unique_ptr<MCTSConfig> g_config = std::unique_ptr<MCTSConfig>(new MCTSConfig);
-
 std::thread g_analyze_thread;
+
+EvalCache* g_eval_cache = new EvalCache();

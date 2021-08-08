@@ -13,6 +13,7 @@
 #include "timer.h"
 #include "zero_model_base.h"
 
+#include "train_data.h"
 #include "mcts_config.h"
 #include "mcts_monitor.h"
 #include "mcts_debugger.h"
@@ -130,16 +131,16 @@ class MCTSEngine
 
     void ApplyTemperature(std::vector<float> &probs, float temperature);
 
-    void TTableUpdate(uint64_t hash, int64_t value);
-    void TTableSync(TreeNode *node);
-    void TTableClear();
+    //void TTableUpdate(uint64_t hash, int64_t value);
+    //void TTableSync(TreeNode *node);
+    //void TTableClear();
 
-    void EvalCacheInsert(uint64_t hash, const std::vector<float> policy, float value);
-    bool EvalCacheFind(uint64_t hash, std::vector<float> &policy, float &value);
+    void EvalCacheInsert(uint64_t hash, const std::vector<float> policy, const float value);
+    bool EvalCacheFind(uint64_t hash, EvalData& evl);
 
     bool IsPassDisable();
     void OutputAnalysis();
-    bool RunOnce();
+    bool RunOnce(TrainData& td);
     
     
  private:

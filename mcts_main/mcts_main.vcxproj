@@ -75,6 +75,7 @@
     <ClInclude Include="..\src\task_queue.h" />
     <ClInclude Include="..\src\thread_conductor.h" />
     <ClInclude Include="..\src\timer.h" />
+    <ClInclude Include="..\src\train_data.h" />
     <ClInclude Include="..\src\trt_zero_model.h" />
     <ClInclude Include="..\src\wait_group.h" />
     <ClInclude Include="..\src\zero_model_base.h" />

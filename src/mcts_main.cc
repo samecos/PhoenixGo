@@ -411,7 +411,6 @@ int main(int argc, char* argv[])
         }
         for (; ; )
         {
-            //Sleep(10000);
             c_count = 0;
             for (int i = 0; i < FLAGS_selfplay_thread_num; ++i)
             {
@@ -428,6 +427,7 @@ int main(int argc, char* argv[])
     {
         GenMoveOnce();
     }
+    //close all Thread
     if (g_analyze_thread.joinable())
     {
         LOG(WARNING) << "search apply threads: terminate";

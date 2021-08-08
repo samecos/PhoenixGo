@@ -10,6 +10,7 @@
 
 #include "analyze.h"
 #include "str_utils.h"
+#include "train_data.h"
 #include "eval_routine.h"
 #include "trt_zero_model.h"
 #include "dist_zero_model_client.h"
@@ -264,23 +265,35 @@ ByoYomiTimer &MCTSEngine::GetByoYomiTimer()
     return m_byo_yomi_timer;
 }
 
-bool MCTSEngine::RunOnce()
+bool MCTSEngine::RunOnce(TrainData& td)
 {
     GoCoordId x = -1, y = -1;
-    VLOG(1) << "eval task queue size is:  " << g_eval_task_queue.Size();
+    //VLOG(1) << "eval task queue size is:  " << g_eval_task_queue.Size();
     GenMove(x, y);
+    SearchPause();
     TreeNode* node = m_debugger.GetEngine()->m_root->ch;
     float sumvisits = m_debugger.GetEngine()->m_root->visit_count;
     int length = m_debugger.GetEngine()->m_root->ch_len;
-    std::vector<float> probslist((GoComm::GOBOARD_SIZE + 1), 0.0);
+    std::vector<float> probslist((GoComm::GOBOARD_SIZE + 1), 0.0f);
     for (int i = 0; i < length; ++i)
     {
         if(node[i].visit_count != 0)
             probslist[node[i].move] = (float)node[i].visit_count / sumvisits;
     }
-    auto features = m_board.GetFeature();
+    td = TrainData(m_board.GetFeature(), probslist, 0);
+    if (GoFunction::IsResign(x, y))
+    {
+        td = TrainData(m_board.GetFeature(), probslist, m_board.Opponent());
+    }
+    else if (!m_config.disable_double_pass_scoring() && m_board.IsDoublePass())
+    {
+        td = TrainData(m_board.GetFeature(), probslist, m_board.GetWinner());
+    }
+    else
+    {
+        td = TrainData(m_board.GetFeature(), probslist, GoComm::COLOR_UNKNOWN);
+    }
     Move(x, y);
-
     if ((!m_config.disable_double_pass_scoring() && m_board.IsDoublePass()) || GoFunction::IsResign(x, y))
     {
         return true;
@@ -292,17 +305,32 @@ void MCTSEngine::RunSelfplay(int single_thread)
 {
     for (int count = 0; count < single_thread; ++count)
     {
+        std::vector<TrainData> onegame;
         for (int movesnum = 0; movesnum < 500 ; ++movesnum)
         {
-            if (RunOnce())
+            TrainData td;
+            auto ret = RunOnce(td);
+            onegame.push_back(td);
+            if (ret)
             {
                 break;
             }
-            
             VLOG(1) << "Thread, ID:   " << m_engine_id
                 << "  ,  " << count + 1 << "th game  ,  "
                 << "selfplay is over ?   " << (m_selfplay_is_over ? "true" : "false");
-
+        }
+        GoStoneColor winner;
+        if (onegame.back().m_winner == GoComm::COLOR_UNKNOWN)
+        {
+            winner = m_board.GetWinner();
+        }
+        else
+        {
+            winner = onegame.back().m_winner;
+        }
+        for (auto val : onegame)
+        {
+            val.m_winner = winner;
         }
     }
     m_selfplay_is_over = true;
@@ -356,55 +384,66 @@ void MCTSEngine::Eval(const GoState &board, EvalCallback callback)
     TransformFeatures(features, transform_mode);
 
     bool dumb_pass = board.GetWinner() != board.CurrentPlayer();
-
-    callback =
-        [this, callback, timer, transform_mode, dumb_pass]
-        (int ret, std::vector<float> policy, float value) {
-            if (ret == 0) {
-                if (dumb_pass && value < 0.5 && !m_config.disable_double_pass_scoring()) {
-                    policy.back() = std::min(policy.back(), 1e-5f); // disallow dumb PASS
-                }
-
-                CHECK_EQ(policy.size(), GoComm::GOBOARD_SIZE + 1)
-                    << "Eval: invalid policy.size(), expect " << GoComm::GOBOARD_SIZE + 1 << ", got " << policy.size();
-                if (m_config.enable_policy_temperature()) {
-                    ApplyTemperature(policy, m_config.policy_temperature());
-                }
+    EvalData evl = EvalData();
+    bool found = EvalCacheFind(board.GetZobristHashValue(), evl);
+    callback = [this, found, callback, board, timer, transform_mode, dumb_pass](int ret, std::vector<float> policy, float value)
+    {
+        if (ret == 0) {
+            if (dumb_pass && value < 0.5 && !m_config.disable_double_pass_scoring()) {
+                policy.back() = std::min(policy.back(), 1e-5f); // disallow dumb PASS
+            }
+            CHECK_EQ(policy.size(), GoComm::GOBOARD_SIZE + 1)
+                << "Eval: invalid policy.size(), expect " << GoComm::GOBOARD_SIZE + 1 << ", got " << policy.size();
+            if (!found)
+            {
                 float pass_policy = policy.back();
                 policy.pop_back(); // make it 19x19
                 TransformFeatures(policy, transform_mode, true);
                 policy.push_back(pass_policy);
+                EvalCacheInsert(board.GetZobristHashValue(), policy, value);
             }
-            m_monitor.MonEvalCostMs(timer.fms());
-            callback(ret, std::move(policy), value);
-        };
-
-    if (m_config.enable_async()) {
-        g_eval_tasks_wg.Add();
-        g_eval_task_queue.Push(
-            EvalTask {
-                features,
-                [this, callback](int ret, std::vector<float> policy, float value) {
-                    callback(ret, std::move(policy), value);
-                    g_eval_tasks_wg.Done();
-                }
+            if (m_config.enable_policy_temperature()) {
+                ApplyTemperature(policy, m_config.policy_temperature());
             }
-        );
-    } else {
-        std::promise<std::tuple<int, std::vector<float>, float>> promise;
-        g_eval_task_queue.Push(
-            EvalTask {
-                features,
-                [&promise](int ret, std::vector<float> policy, float value) {
-                    promise.set_value(std::make_tuple(ret, std::move(policy), value));
-                }
-            }
-        );
-        int ret;
-        std::vector<float> policy;
-        float value;
-        std::tie(ret, policy, value) = promise.get_future().get();
+        }
+        m_monitor.MonEvalCostMs(timer.fms());
         callback(ret, std::move(policy), value);
+    };
+
+    if (found)
+    {
+        callback(0, evl.prob, evl.value);
+    }
+    else
+    {
+        if (m_config.enable_async()) {
+            g_eval_tasks_wg.Add();
+            g_eval_task_queue.Push(
+                EvalTask{
+                    features,
+                    [this, callback](int ret, std::vector<float> policy, float value) {
+                        callback(ret, std::move(policy), value);
+                        g_eval_tasks_wg.Done();
+                    }
+                }
+            );
+        }
+        else {
+            std::promise<std::tuple<int, std::vector<float>, float>> promise;
+            g_eval_task_queue.Push(
+                EvalTask{
+                    features,
+                    [&promise](int ret, std::vector<float> policy, float value) {
+                        promise.set_value(std::make_tuple(ret, std::move(policy), value));
+                    }
+                }
+            );
+            int ret;
+            std::vector<float> policy;
+            float value;
+            std::tie(ret, policy, value) = promise.get_future().get();
+            callback(ret, std::move(policy), value);
+        }
     }
     m_monitor.MonTaskQueueSize(g_eval_task_queue.Size());
 }
@@ -1065,6 +1104,17 @@ void MCTSEngine::ApplyTemperature(std::vector<float> &probs, float temperature)
     for (float &p: probs) {
         p /= s;
     }
+}
+
+void MCTSEngine::EvalCacheInsert(uint64_t hash, const std::vector<float> policy, const float value)
+{
+    EvalData evald = EvalData(policy, value);
+    g_eval_cache->Insert(hash, evald);
+}
+
+bool MCTSEngine::EvalCacheFind(uint64_t hash, EvalData& evl)
+{
+    return g_eval_cache->Probe(hash, evl);
 }
 
 bool MCTSEngine::IsPassDisable()
