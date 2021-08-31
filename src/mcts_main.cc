@@ -403,9 +403,6 @@ int main(int argc, char* argv[])
 
         for (int i = 0; i < FLAGS_selfplay_thread_num; ++i)
         {
-            //auto engine = InitSelfplayEngine(i);
-            //engine->InitSelfplay(single_thread);
-            //engines.emplace_back(std::move(engine));
             engines.emplace_back(new MCTSEngine(*g_config, i));
             engines.back()->InitSelfplay(single_thread);
         }
@@ -419,7 +416,7 @@ int main(int argc, char* argv[])
                     ++c_count;
                 }
             }
-            if (c_count = FLAGS_selfplay_thread_num)
+            if (c_count == FLAGS_selfplay_thread_num)
                 break;
         }
     }

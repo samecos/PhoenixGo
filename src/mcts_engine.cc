@@ -386,7 +386,9 @@ void MCTSEngine::Eval(const GoState &board, EvalCallback callback)
     bool dumb_pass = board.GetWinner() != board.CurrentPlayer();
     EvalData evl = EvalData();
     bool found = EvalCacheFind(board.GetZobristHashValue(), evl);
-    callback = [this, found, callback, board, timer, transform_mode, dumb_pass](int ret, std::vector<float> policy, float value)
+    callback = 
+        [this, found, callback, board, timer, transform_mode, dumb_pass]
+        (int ret, std::vector<float> policy, float value)
     {
         if (ret == 0) {
             if (dumb_pass && value < 0.5 && !m_config.disable_double_pass_scoring()) {
@@ -569,7 +571,7 @@ void MCTSEngine::Backup(TreeNode *node, float value_f, int ch_len)
 {
     Timer timer;
     node->value = value_f;
-    int64_t value = value_f * k_action_value_base;
+    int64_t value = (double)value_f * k_action_value_base;
     int depth = 1;
     while (node != nullptr) {
         node->size += ch_len;
@@ -722,10 +724,10 @@ int64_t MCTSEngine::GetSearchOvertimeUs(int64_t timeout_us)
 {
     if (timeout_us > 0) {
         if (CheckUnstable()) {
-            return timeout_us * m_config.unstable_overtime().time_factor();
+            return timeout_us * (double)m_config.unstable_overtime().time_factor();
         }
         if (CheckBehind()) {
-            return timeout_us * m_config.behind_overtime().time_factor();
+            return timeout_us * (double)m_config.behind_overtime().time_factor();
         }
     }
     return 0;
